@@ -8,6 +8,7 @@ import { UserRole } from '@prisma/client'
 export const runtime = 'nodejs'
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  trustHost: true,
   providers: [
     Credentials({
       name: 'credentials',
