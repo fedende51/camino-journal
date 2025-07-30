@@ -13,7 +13,10 @@
       "Bash(npx prisma generate:*)",
       "Bash(npx prisma:*)",
       "Bash(git init:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(npm run type-check:*)",
+      "Bash(npm run lint)"
     ],
     "deny": []
   }
