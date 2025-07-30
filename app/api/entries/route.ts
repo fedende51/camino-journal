@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
 // GET /api/entries - List entries (with optional privacy filtering)
@@ -12,7 +11,7 @@ export async function GET(request: NextRequest) {
 
     // If includePrivate is true, verify the user is authenticated
     if (includePrivate) {
-      const session = await getServerSession(authOptions)
+      const session = await auth()
       if (!session || !userId || session.user.id !== userId) {
         return NextResponse.json(
           { error: 'Unauthorized' },
@@ -60,7 +59,7 @@ export async function GET(request: NextRequest) {
 // POST /api/entries - Create new entry
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await auth()
     
     if (!session || session.user.role !== 'PILGRIM') {
       return NextResponse.json(

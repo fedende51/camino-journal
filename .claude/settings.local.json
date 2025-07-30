@@ -16,7 +16,8 @@
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(npm run type-check:*)",
-      "Bash(npm run lint)"
+      "Bash(npm run lint)",
+      "Bash(npm uninstall:*)"
     ],
     "deny": []
   }

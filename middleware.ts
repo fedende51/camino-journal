@@ -1,44 +1,41 @@
-import { withAuth } from 'next-auth/middleware'
+import { auth } from '@/lib/auth'
 import { NextResponse } from 'next/server'
 
-export default withAuth(
-  function middleware(req) {
-    // Pilgrim-only routes - require authentication and PILGRIM role
-    if (req.nextUrl.pathname.startsWith('/pilgrim')) {
-      if (req.nextauth.token?.role !== 'PILGRIM') {
-        return NextResponse.redirect(new URL('/login', req.url))
-      }
-    }
-
+export default auth((req) => {
+  // Public routes - allow access
+  const publicPaths = [
+    '/api/auth',
+    '/login',
+    '/register',
+    '/',
+    '/journal',
+    '/entry/'
+  ]
+  
+  const isPublicPath = publicPaths.some(path => 
+    req.nextUrl.pathname.startsWith(path)
+  )
+  
+  if (isPublicPath) {
     return NextResponse.next()
-  },
-  {
-    callbacks: {
-      authorized: ({ token, req }) => {
-        // Public routes - no authentication required
-        if (req.nextUrl.pathname.startsWith('/api/auth') || 
-            req.nextUrl.pathname === '/login' || 
-            req.nextUrl.pathname === '/register' ||
-            req.nextUrl.pathname === '/' ||
-            req.nextUrl.pathname.startsWith('/journal') ||
-            req.nextUrl.pathname.startsWith('/entry/')) {
-          return true
-        }
-
-        // Protected routes - require authentication
-        if (req.nextUrl.pathname.startsWith('/pilgrim')) {
-          return !!token
-        }
-
-        // Default to allowing access
-        return true
-      },
-    },
   }
-)
+
+  // Pilgrim-only routes - require authentication and PILGRIM role
+  if (req.nextUrl.pathname.startsWith('/pilgrim')) {
+    if (!req.auth) {
+      return NextResponse.redirect(new URL('/login', req.url))
+    }
+    
+    if (req.auth.user.role !== 'PILGRIM') {
+      return NextResponse.redirect(new URL('/login', req.url))
+    }
+  }
+
+  return NextResponse.next()
+})
 
 export const config = {
   matcher: [
-    '/pilgrim/:path*',
+    '/((?!_next/static|_next/image|favicon.ico).*)',
   ],
 }
