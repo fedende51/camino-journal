@@ -76,7 +76,7 @@ model VerificationToken {
 
 enum UserRole {
   PILGRIM
-  FAMILY
+  FAMILY // Kept for future use, but family viewing is now public
 }
 
 // Journal Entries table

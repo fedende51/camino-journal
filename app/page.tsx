@@ -38,18 +38,24 @@ export default function Home() {
           </ul>
         </div>
 
-        <div className="flex space-x-4 justify-center">
+        <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4 justify-center">
+          <a
+            href="/journal"
+            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md text-sm font-medium text-center"
+          >
+            View Journal (Public)
+          </a>
           <a
             href="/login"
-            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md text-sm font-medium"
+            className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded-md text-sm font-medium text-center"
           >
-            Sign In
+            Pilgrim Login
           </a>
           <a
             href="/register"
-            className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-md text-sm font-medium"
+            className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-md text-sm font-medium text-center"
           >
-            Register
+            Register as Pilgrim
           </a>
         </div>
 

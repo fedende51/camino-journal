@@ -5,7 +5,8 @@ import { UserRole } from '@prisma/client'
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, password, name, role = UserRole.PILGRIM } = await request.json()
+    const { email, password, name } = await request.json()
+    const role = UserRole.PILGRIM // All registered users are pilgrims
 
     if (!email || !password) {
       return NextResponse.json(

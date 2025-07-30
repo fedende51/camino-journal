@@ -9,8 +9,7 @@ export default function RegisterPage() {
     name: '',
     email: '',
     password: '',
-    confirmPassword: '',
-    role: 'PILGRIM' as 'PILGRIM' | 'FAMILY'
+    confirmPassword: ''
   })
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
@@ -37,7 +36,6 @@ export default function RegisterPage() {
           name: formData.name,
           email: formData.email,
           password: formData.password,
-          role: formData.role,
         }),
       })
 
@@ -69,15 +67,15 @@ export default function RegisterPage() {
       <div className="max-w-md w-full space-y-8">
         <div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Create your account
+            Create Pilgrim Account
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
-            Or{' '}
+            Register to create and manage your Camino journal entries<br/>
             <Link
               href="/login"
               className="font-medium text-blue-600 hover:text-blue-500"
             >
-              sign in to existing account
+              Already have an account? Sign in
             </Link>
           </p>
         </div>
@@ -117,21 +115,6 @@ export default function RegisterPage() {
               />
             </div>
 
-            <div>
-              <label htmlFor="role" className="block text-sm font-medium text-gray-700">
-                Account Type
-              </label>
-              <select
-                id="role"
-                name="role"
-                value={formData.role}
-                onChange={handleChange}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-              >
-                <option value="PILGRIM">Pilgrim (Can create entries)</option>
-                <option value="FAMILY">Family Member (View only)</option>
-              </select>
-            </div>
 
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700">

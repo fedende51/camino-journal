@@ -29,13 +29,8 @@ export default function LoginPage() {
         return
       }
 
-      // Check user role and redirect accordingly
-      const session = await getSession()
-      if (session?.user?.role === 'PILGRIM') {
-        router.push('/pilgrim')
-      } else {
-        router.push('/journal')
-      }
+      // Redirect to pilgrim dashboard
+      router.push('/pilgrim')
     } catch (error) {
       setError('Something went wrong')
     } finally {
