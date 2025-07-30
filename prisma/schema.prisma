@@ -1,0 +1,101 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Users table
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  role      UserRole @default(PILGRIM)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  entries Entry[]
+
+  @@map("users")
+}
+
+enum UserRole {
+  PILGRIM
+  FAMILY
+}
+
+// Journal Entries table
+model Entry {
+  id         String   @id @default(cuid())
+  userId     String
+  dayNumber  Int
+  date       DateTime
+  title      String?
+  location   String
+  content    String
+  isPrivate  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relations
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  photos     Photo[]
+  audioFiles AudioFile[]
+  gpsData    GPSData?
+
+  @@map("entries")
+}
+
+// Photos table
+model Photo {
+  id        String   @id @default(cuid())
+  entryId   String
+  blobUrl   String
+  filename  String
+  isHero    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  // Relations
+  entry Entry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  @@map("photos")
+}
+
+// GPS Data table
+model GPSData {
+  id               String  @id @default(cuid())
+  entryId          String  @unique
+  startLocation    String
+  endLocation      String
+  distanceKm       Float?
+  elevationGainM   Int?
+  durationMinutes  Int?
+  stravaActivityId String?
+  createdAt        DateTime @default(now())
+
+  // Relations
+  entry Entry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  @@map("gps_data")
+}
+
+// Audio Files table
+model AudioFile {
+  id            String   @id @default(cuid())
+  entryId       String
+  blobUrl       String
+  filename      String
+  transcription String?
+  processed     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  // Relations
+  entry Entry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  @@map("audio_files")
+}
