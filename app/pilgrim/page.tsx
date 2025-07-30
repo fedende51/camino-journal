@@ -2,11 +2,45 @@
 
 import { useSession, signOut } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { useEffect } from 'react'
+import { useEffect, useState, useCallback } from 'react'
+import Link from 'next/link'
+
+interface Entry {
+  id: string
+  dayNumber: number
+  date: string
+  location: string
+  title?: string
+  content: string
+  isPrivate: boolean
+  createdAt: string
+  user: {
+    name?: string
+    email: string
+  }
+}
 
 export default function PilgrimDashboard() {
   const { data: session, status } = useSession()
   const router = useRouter()
+  const [entries, setEntries] = useState<Entry[]>([])
+  const [isLoadingEntries, setIsLoadingEntries] = useState(true)
+
+  const fetchEntries = useCallback(async () => {
+    if (!session?.user.id) return
+    
+    try {
+      const response = await fetch(`/api/entries?includePrivate=true&userId=${session.user.id}`)
+      const data = await response.json()
+      if (response.ok) {
+        setEntries(data.entries || [])
+      }
+    } catch (error) {
+      console.error('Error fetching entries:', error)
+    } finally {
+      setIsLoadingEntries(false)
+    }
+  }, [session?.user.id])
 
   useEffect(() => {
     if (status === 'loading') return
@@ -18,7 +52,10 @@ export default function PilgrimDashboard() {
       router.push('/')
       return
     }
-  }, [session, status, router])
+    
+    // Fetch user's entries
+    fetchEntries()
+  }, [session, status, router, fetchEntries])
 
   if (status === 'loading') {
     return (
@@ -80,9 +117,12 @@ export default function PilgrimDashboard() {
                   </div>
                 </div>
                 <div className="mt-4">
-                  <button className="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium">
+                  <Link
+                    href="/pilgrim/create"
+                    className="block w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium text-center"
+                  >
                     Start New Entry
-                  </button>
+                  </Link>
                 </div>
               </div>
             </div>
@@ -106,9 +146,12 @@ export default function PilgrimDashboard() {
                   </div>
                 </div>
                 <div className="mt-4">
-                  <button className="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium">
-                    View Entries
-                  </button>
+                  <Link
+                    href="/journal"
+                    className="block w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium text-center"
+                  >
+                    View Public Journal
+                  </Link>
                 </div>
               </div>
             </div>
@@ -132,20 +175,105 @@ export default function PilgrimDashboard() {
                   </div>
                 </div>
                 <div className="mt-4">
-                  <div className="text-2xl font-bold text-gray-900">0</div>
+                  <div className="text-2xl font-bold text-gray-900">{entries.length}</div>
                   <div className="text-sm text-gray-500">Days completed</div>
                 </div>
               </div>
             </div>
           </div>
 
+          {/* Entries List */}
+          <div className="mt-8">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Your Journal Entries</h2>
+            
+            {isLoadingEntries ? (
+              <div className="bg-white shadow rounded-lg p-8 text-center">
+                <div className="text-gray-500">Loading entries...</div>
+              </div>
+            ) : entries.length === 0 ? (
+              <div className="bg-white shadow rounded-lg p-8 text-center">
+                <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+                  <span className="text-2xl">📝</span>
+                </div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No entries yet</h3>
+                <p className="text-gray-500 mb-4">
+                  Start documenting your Camino journey by creating your first entry.
+                </p>
+                <Link
+                  href="/pilgrim/create"
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
+                >
+                  Create First Entry
+                </Link>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {entries.map((entry) => (
+                  <div key={entry.id} className="bg-white shadow rounded-lg p-6">
+                    <div className="flex justify-between items-start mb-3">
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-900">
+                          Day {entry.dayNumber} - {entry.location}
+                        </h3>
+                        {entry.title && (
+                          <p className="text-gray-600 mt-1">{entry.title}</p>
+                        )}
+                        <p className="text-sm text-gray-500 mt-1">
+                          {new Date(entry.date).toLocaleDateString('en-US', {
+                            weekday: 'long',
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                          })}
+                        </p>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className={`px-2 py-1 rounded-full text-xs ${
+                          entry.isPrivate
+                            ? 'bg-gray-100 text-gray-800'
+                            : 'bg-green-100 text-green-800'
+                        }`}>
+                          {entry.isPrivate ? 'Private' : 'Public'}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <p className="text-gray-700 mb-4 line-clamp-3">
+                      {entry.content.length > 200 
+                        ? `${entry.content.substring(0, 200)}...` 
+                        : entry.content
+                      }
+                    </p>
+                    
+                    <div className="flex justify-between items-center">
+                      <div className="text-sm text-gray-500">
+                        {entry.content.length} characters
+                      </div>
+                      <div className="space-x-2">
+                        <button className="text-blue-600 hover:text-blue-800 text-sm font-medium">
+                          Edit
+                        </button>
+                        <Link 
+                          href={`/entry/${entry.id}`}
+                          className="text-green-600 hover:text-green-800 text-sm font-medium"
+                        >
+                          View
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* Status Message */}
-          <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-6">
-            <h2 className="text-lg font-semibold text-blue-800 mb-2">
-              🚀 Phase 1B: Authentication & Basic UI Complete
+          <div className="mt-8 bg-green-50 border border-green-200 rounded-lg p-6">
+            <h2 className="text-lg font-semibold text-green-800 mb-2">
+              ✅ Phase 1B: Entry Creation Complete
             </h2>
-            <p className="text-blue-700">
-              You&apos;re now logged in as a pilgrim! The entry creation form is coming next in Phase 1C.
+            <p className="text-green-700">
+              You can now create and manage journal entries! Audio processing and photo uploads coming in Phase 1C.
             </p>
           </div>
         </div>
