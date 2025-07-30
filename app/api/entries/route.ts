@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { dayNumber, date, location, title, content, isPrivate } = await request.json()
+    const { dayNumber, date, location, title, content, isPrivate, audioUrl, photoUrls, heroPhotoIndex, gpsData } = await request.json()
 
     // Validation
     if (!dayNumber || !date || !location || !content) {
@@ -112,9 +112,78 @@ export async function POST(request: NextRequest) {
           }
         },
         photos: true,
-        gpsData: true
+        gpsData: true,
+        audioFiles: true
       }
     })
+
+    // If audioUrl provided, create audio file record
+    if (audioUrl) {
+      try {
+        await prisma.audioFile.create({
+          data: {
+            entryId: entry.id,
+            blobUrl: audioUrl,
+            filename: audioUrl.split('/').pop() || 'audio.m4a',
+            processed: true // Audio is already processed if we're creating the entry
+          }
+        })
+      } catch (error) {
+        console.error('Failed to create audio file record:', error)
+        // Don't fail the entire request if audio file creation fails
+      }
+    }
+
+    // If photoUrls provided, create photo records
+    if (photoUrls && Array.isArray(photoUrls) && photoUrls.length > 0) {
+      try {
+        const photoCreatePromises = photoUrls.map((url: string, index: number) => {
+          return prisma.photo.create({
+            data: {
+              entryId: entry.id,
+              blobUrl: url,
+              filename: url.split('/').pop() || `photo-${index + 1}.jpg`,
+              isHero: index === (heroPhotoIndex >= 0 ? heroPhotoIndex : 0) // First photo is hero by default
+            }
+          })
+        })
+
+        await Promise.all(photoCreatePromises)
+      } catch (error) {
+        console.error('Failed to create photo records:', error)
+        // Don't fail the entire request if photo creation fails
+      }
+    }
+
+    // If gpsData provided, create GPS data record
+    if (gpsData) {
+      try {
+        await prisma.gPSData.create({
+          data: {
+            entryId: entry.id,
+            startLocation: gpsData.startLocation,
+            endLocation: gpsData.endLocation,
+            distanceKm: gpsData.distanceKm,
+            elevationGainM: gpsData.elevationGainM,
+            durationMinutes: gpsData.durationMinutes,
+            averageSpeedKmh: gpsData.averageSpeedKmh,
+            startTime: new Date(gpsData.startTime),
+            endTime: new Date(gpsData.endTime),
+            calories: gpsData.calories,
+            averageHeartRate: gpsData.heartRateData?.average,
+            maxHeartRate: gpsData.heartRateData?.max,
+            source: gpsData.source,
+            externalActivityId: gpsData.activityId,
+            externalUrl: gpsData.externalUrl,
+            // coordinates would be stored as JSON if needed
+            rawData: gpsData.coordinates ? JSON.stringify(gpsData.coordinates) : null
+          }
+        })
+      } catch (error) {
+        console.error('Failed to create GPS data record:', error)
+        // Don't fail the entire request if GPS data creation fails
+      }
+    }
 
     return NextResponse.json(
       { message: 'Entry created successfully', entry },

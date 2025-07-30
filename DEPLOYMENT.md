@@ -101,3 +101,12 @@ vercel env add
 - [ ] Custom domain configured (optional)
 - [ ] Error monitoring set up (optional: Sentry)
 - [ ] Analytics configured (Vercel Analytics included)
+
+
+# DB Admin credentials
+Go to http://localhost:8080 and login with:
+  - System: PostgreSQL
+  - Server: postgres
+  - Username: camino_user
+  - Password: camino_secure_password_2024
+  - Database: camino_journal

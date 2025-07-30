@@ -6,7 +6,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -118,15 +118,25 @@ model Photo {
 
 // GPS Data table
 model GPSData {
-  id               String  @id @default(cuid())
-  entryId          String  @unique
-  startLocation    String
-  endLocation      String
-  distanceKm       Float?
-  elevationGainM   Int?
-  durationMinutes  Int?
-  stravaActivityId String?
-  createdAt        DateTime @default(now())
+  id                   String    @id @default(cuid())
+  entryId              String    @unique
+  startLocation        String
+  endLocation          String
+  distanceKm           Float?
+  elevationGainM       Int?
+  durationMinutes      Int?
+  averageSpeedKmh      Float?
+  startTime            DateTime?
+  endTime              DateTime?
+  calories             Int?
+  averageHeartRate     Int?
+  maxHeartRate         Int?
+  source               String?
+  externalActivityId   String?
+  externalUrl          String?
+  rawData              String?   // JSON string of coordinates
+  stravaActivityId     String?   // Legacy field, keeping for compatibility
+  createdAt            DateTime  @default(now())
 
   // Relations
   entry Entry @relation(fields: [entryId], references: [id], onDelete: Cascade)

@@ -1,6 +1,9 @@
 import { prisma } from '@/lib/prisma'
 import Link from 'next/link'
 
+// Disable static generation for this page
+export const dynamic = 'force-dynamic'
+
 interface Entry {
   id: string
   dayNumber: number
@@ -88,11 +91,28 @@ export default async function JournalPage() {
             <div className="space-y-8">
               {entries.map((entry) => (
                 <article key={entry.id} className="bg-white shadow rounded-lg overflow-hidden">
-                  {/* Hero Photo Placeholder */}
+                  {/* Hero Photo */}
                   {entry.photos.length > 0 ? (
-                    <div className="w-full h-48 bg-gray-200 flex items-center justify-center">
-                      <span className="text-gray-500">Hero Photo (Coming in Phase 2A)</span>
-                    </div>
+                    (() => {
+                      const heroPhoto = entry.photos.find(p => p.isHero) || entry.photos[0]
+                      return (
+                        <div className="relative w-full h-48 bg-gray-200 overflow-hidden">
+                          <img
+                            src={heroPhoto.blobUrl}
+                            alt={entry.title || `Day ${entry.dayNumber} - ${entry.location}`}
+                            className="w-full h-full object-cover"
+                          />
+                          <div className="absolute top-4 left-4 bg-white bg-opacity-90 text-gray-900 px-3 py-1 rounded-full text-sm font-medium">
+                            Day {entry.dayNumber}
+                          </div>
+                          {entry.photos.length > 1 && (
+                            <div className="absolute top-4 right-4 bg-black bg-opacity-75 text-white px-3 py-1 rounded-full text-sm">
+                              +{entry.photos.length - 1} photos
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })()
                   ) : (
                     <div className="w-full h-48 bg-gradient-to-r from-blue-400 to-purple-500 flex items-center justify-center">
                       <div className="text-white text-center">

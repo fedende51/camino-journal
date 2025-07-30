@@ -18,6 +18,15 @@ interface Entry {
     name?: string
     email: string
   }
+  photos: Array<{
+    id: string
+    blobUrl: string
+    filename: string
+    isHero: boolean
+  }>
+  _count: {
+    audioFiles: number
+  }
 }
 
 export default function PilgrimDashboard() {
@@ -246,8 +255,20 @@ export default function PilgrimDashboard() {
                     </p>
                     
                     <div className="flex justify-between items-center">
-                      <div className="text-sm text-gray-500">
-                        {entry.content.length} characters
+                      <div className="flex items-center space-x-4 text-sm text-gray-500">
+                        <span>{entry.content.length} characters</span>
+                        {entry.photos && entry.photos.length > 0 && (
+                          <span className="flex items-center space-x-1">
+                            <span>📸</span>
+                            <span>{entry.photos.length}</span>
+                          </span>
+                        )}
+                        {entry._count?.audioFiles > 0 && (
+                          <span className="flex items-center space-x-1">
+                            <span>🎤</span>
+                            <span>{entry._count.audioFiles}</span>
+                          </span>
+                        )}
                       </div>
                       <div className="space-x-2">
                         <button className="text-blue-600 hover:text-blue-800 text-sm font-medium">
@@ -270,10 +291,10 @@ export default function PilgrimDashboard() {
           {/* Status Message */}
           <div className="mt-8 bg-green-50 border border-green-200 rounded-lg p-6">
             <h2 className="text-lg font-semibold text-green-800 mb-2">
-              ✅ Phase 1B: Entry Creation Complete
+              ✅ Phase 2B: GPS Integration Complete
             </h2>
             <p className="text-green-700">
-              You can now create and manage journal entries! Audio processing and photo uploads coming in Phase 1C.
+              Your Camino journal now supports audio transcription, photo galleries, and GPS route data from Strava/Garmin! Enhanced features coming in Phase 2C.
             </p>
           </div>
         </div>

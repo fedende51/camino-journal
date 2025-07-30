@@ -27,6 +27,7 @@ export default async function EntryPage({ params }: EntryPageProps) {
         select: {
           id: true,
           filename: true,
+          blobUrl: true,
           transcription: true,
           processed: true
         }
@@ -107,20 +108,30 @@ export default async function EntryPage({ params }: EntryPageProps) {
       <main className="max-w-4xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
           
-          {/* Hero Photo Placeholder */}
+          {/* Hero Photo */}
           {entry.photos.length > 0 ? (
             <div className="mb-8">
-              <div className="bg-gray-200 rounded-lg h-64 flex items-center justify-center">
-                <span className="text-gray-500">Hero Photo (Coming in Phase 2A)</span>
-              </div>
+              {(() => {
+                const heroPhoto = entry.photos.find(p => p.isHero) || entry.photos[0]
+                return (
+                  <div className="relative">
+                    <div className="aspect-[16/9] bg-gray-200 rounded-lg overflow-hidden">
+                      <img
+                        src={heroPhoto.blobUrl}
+                        alt={entry.title || `Day ${entry.dayNumber} - ${entry.location}`}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    {entry.photos.length > 1 && (
+                      <div className="absolute top-4 right-4 bg-black bg-opacity-75 text-white px-3 py-1 rounded-full text-sm">
+                        +{entry.photos.length - 1} more
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
             </div>
-          ) : (
-            <div className="mb-8 bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <p className="text-blue-700 text-sm">
-                📸 Photo functionality coming in Phase 2A
-              </p>
-            </div>
-          )}
+          ) : null}
 
           {/* Entry Content */}
           <div className="bg-white shadow rounded-lg p-8 mb-8">
@@ -134,25 +145,118 @@ export default async function EntryPage({ params }: EntryPageProps) {
           {/* Audio Files */}
           {entry.audioFiles.length > 0 && (
             <div className="bg-white shadow rounded-lg p-6 mb-8">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Audio Recordings</h3>
-              <div className="space-y-3">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">
+                🎤 Audio Recordings
+              </h3>
+              <div className="space-y-4">
                 {entry.audioFiles.map((audio) => (
                   <div key={audio.id} className="border border-gray-200 rounded-lg p-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-gray-900">{audio.filename}</span>
-                      <span className={`px-2 py-1 rounded-full text-xs ${
-                        audio.processed ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-                      }`}>
-                        {audio.processed ? 'Processed' : 'Processing...'}
-                      </span>
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                          <span className="text-lg">🎵</span>
+                        </div>
+                        <div>
+                          <span className="text-sm font-medium text-gray-900">{audio.filename}</span>
+                          <div className="flex items-center space-x-2 mt-1">
+                            <span className={`px-2 py-1 rounded-full text-xs ${
+                              audio.processed ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                            }`}>
+                              {audio.processed ? 'Processed' : 'Processing...'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
                     </div>
+                    
+                    {/* Audio Player */}
+                    {audio.blobUrl && (
+                      <div className="mb-3">
+                        <audio controls className="w-full">
+                          <source src={audio.blobUrl} type="audio/mpeg" />
+                          Your browser does not support the audio element.
+                        </audio>
+                      </div>
+                    )}
+                    
+                    {/* Transcription */}
                     {audio.transcription && (
-                      <div className="mt-3 text-sm text-gray-600 bg-gray-50 rounded p-3">
-                        <strong>Transcription:</strong> {audio.transcription}
+                      <div className="mt-3">
+                        <details className="group">
+                          <summary className="flex cursor-pointer items-center justify-between rounded-lg p-2 text-gray-900 hover:bg-gray-50">
+                            <div className="flex items-center space-x-2">
+                              <span className="text-sm font-medium">View Transcription</span>
+                              <span className="text-xs text-gray-500">
+                                ({audio.transcription.split(' ').length} words)
+                              </span>
+                            </div>
+                            <span className="shrink-0 transition duration-300 group-open:-rotate-180">
+                              <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </span>
+                          </summary>
+                          
+                          <div className="mt-2 px-2">
+                            <div className="text-sm text-gray-600 bg-gray-50 rounded-lg p-4 border-l-4 border-blue-200">
+                              <div className="font-medium text-gray-900 mb-2">Original transcription:</div>
+                              <div className="whitespace-pre-wrap leading-relaxed">
+                                {audio.transcription}
+                              </div>
+                            </div>
+                          </div>
+                        </details>
                       </div>
                     )}
                   </div>
                 ))}
+              </div>
+              
+              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-700">
+                  <strong>💡 Audio Processing:</strong> Voice recordings are automatically transcribed and cleaned up by AI to create the journal content above.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Photo Gallery */}
+          {entry.photos.length > 1 && (
+            <div className="bg-white shadow rounded-lg p-6 mb-8">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">
+                📸 Photo Gallery ({entry.photos.length} photos)
+              </h3>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {entry.photos.map((photo, index) => (
+                  <div key={photo.id} className="relative group">
+                    <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden cursor-pointer">
+                      <img
+                        src={photo.blobUrl}
+                        alt={`Photo ${index + 1}`}
+                        className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                      />
+                    </div>
+                    {photo.isHero && (
+                      <div className="absolute top-2 left-2 bg-yellow-500 text-white px-2 py-1 rounded-full text-xs font-medium">
+                        Hero
+                      </div>
+                    )}
+                    {/* Photo overlay on hover */}
+                    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-25 transition-all duration-200 rounded-lg flex items-center justify-center">
+                      <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button className="bg-white text-gray-900 px-3 py-1 rounded-full text-sm font-medium shadow-lg">
+                          View Full Size
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              
+              <div className="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                <p className="text-sm text-gray-600">
+                  <strong>💡 Photo Gallery:</strong> Click any photo to view it in full size. The hero image is featured at the top of this entry.
+                </p>
               </div>
             </div>
           )}
@@ -160,56 +264,101 @@ export default async function EntryPage({ params }: EntryPageProps) {
           {/* GPS Data */}
           {entry.gpsData ? (
             <div className="bg-white shadow rounded-lg p-6 mb-8">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Route Information</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {entry.gpsData.distanceKm && (
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-blue-600">{entry.gpsData.distanceKm} km</div>
-                    <div className="text-sm text-gray-500">Distance</div>
-                  </div>
-                )}
-                {entry.gpsData.elevationGainM && (
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-green-600">+{entry.gpsData.elevationGainM} m</div>
-                    <div className="text-sm text-gray-500">Elevation Gain</div>
-                  </div>
-                )}
-                {entry.gpsData.durationMinutes && (
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-purple-600">
-                      {Math.floor(entry.gpsData.durationMinutes / 60)}h {entry.gpsData.durationMinutes % 60}m
-                    </div>
-                    <div className="text-sm text-gray-500">Duration</div>
-                  </div>
-                )}
-              </div>
-              
-              <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-                <div className="text-sm text-gray-600">
-                  <strong>Route:</strong> {entry.gpsData.startLocation} → {entry.gpsData.endLocation}
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-medium text-gray-900">🗺️ Route Information</h3>
+                <div className="flex items-center space-x-2">
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                    entry.gpsData.source === 'strava' ? 'bg-orange-100 text-orange-800' :
+                    entry.gpsData.source === 'garmin' ? 'bg-blue-100 text-blue-800' :
+                    'bg-gray-100 text-gray-800'
+                  }`}>
+                    {entry.gpsData.source === 'strava' ? 'Strava' :
+                     entry.gpsData.source === 'garmin' ? 'Garmin' : 'Manual Entry'}
+                  </span>
                 </div>
               </div>
               
-              {entry.gpsData.stravaActivityId && (
-                <div className="mt-4">
+              {/* Main Stats */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-blue-600">{entry.gpsData.distanceKm} km</div>
+                  <div className="text-sm text-gray-500">Distance</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-green-600">+{entry.gpsData.elevationGainM} m</div>
+                  <div className="text-sm text-gray-500">Elevation Gain</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-purple-600">
+                    {entry.gpsData.durationMinutes ? `${Math.floor(entry.gpsData.durationMinutes / 60)}h ${entry.gpsData.durationMinutes % 60}m` : 'N/A'}
+                  </div>
+                  <div className="text-sm text-gray-500">Duration</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-indigo-600">{entry.gpsData.averageSpeedKmh || 'N/A'} km/h</div>
+                  <div className="text-sm text-gray-500">Avg Speed</div>
+                </div>
+              </div>
+              
+              {/* Route Information */}
+              <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                <div className="text-sm text-gray-600 mb-2">
+                  <strong>Route:</strong> {entry.gpsData.startLocation} → {entry.gpsData.endLocation}
+                </div>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-gray-500">Start Time:</span>
+                    <div className="font-medium">{entry.gpsData.startTime ? new Date(entry.gpsData.startTime).toLocaleTimeString() : 'N/A'}</div>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">End Time:</span>
+                    <div className="font-medium">{entry.gpsData.endTime ? new Date(entry.gpsData.endTime).toLocaleTimeString() : 'N/A'}</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Additional Stats */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                {entry.gpsData.calories && (
+                  <div className="bg-red-50 rounded-lg p-3 text-center">
+                    <div className="text-lg font-semibold text-red-600">{entry.gpsData.calories}</div>
+                    <div className="text-red-500">Calories</div>
+                  </div>
+                )}
+                {entry.gpsData.averageHeartRate && (
+                  <div className="bg-pink-50 rounded-lg p-3 text-center">
+                    <div className="text-lg font-semibold text-pink-600">{entry.gpsData.averageHeartRate} bpm</div>
+                    <div className="text-pink-500">Avg Heart Rate</div>
+                  </div>
+                )}
+                <div className="bg-blue-50 rounded-lg p-3 text-center">
+                  <div className="text-lg font-semibold text-blue-600">
+                    {(entry.gpsData.durationMinutes && entry.gpsData.distanceKm) 
+                      ? `${Math.round((entry.gpsData.durationMinutes / entry.gpsData.distanceKm) * 100) / 100} min/km`
+                      : 'N/A'}
+                  </div>
+                  <div className="text-blue-500">Pace</div>
+                </div>
+              </div>
+              
+              {/* External Link */}
+              {entry.gpsData.externalUrl && (
+                <div className="mt-4 pt-4 border-t border-gray-200">
                   <a 
-                    href={`https://www.strava.com/activities/${entry.gpsData.stravaActivityId}`}
+                    href={entry.gpsData.externalUrl}
                     target="_blank"
                     rel="noopener noreferrer" 
-                    className="text-orange-600 hover:text-orange-800 text-sm font-medium"
+                    className={`inline-flex items-center text-sm font-medium hover:underline ${
+                      entry.gpsData.source === 'strava' ? 'text-orange-600 hover:text-orange-800' :
+                      'text-blue-600 hover:text-blue-800'
+                    }`}
                   >
-                    View on Strava →
+                    View on {entry.gpsData.source === 'strava' ? 'Strava' : 'Garmin Connect'} →
                   </a>
                 </div>
               )}
             </div>
-          ) : (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-8">
-              <p className="text-yellow-700 text-sm">
-                🗺️ GPS data integration coming in Phase 2B
-              </p>
-            </div>
-          )}
+          ) : null}
 
           {/* Entry Metadata */}
           <div className="bg-white shadow rounded-lg p-6">

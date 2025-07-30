@@ -20,7 +20,15 @@
       "Bash(npm uninstall:*)",
       "Bash(mv:*)",
       "Bash(node:*)",
-      "Bash(npm run dev:*)"
+      "Bash(npm run dev:*)",
+      "Bash(cp:*)",
+      "Bash(docker-compose:*)",
+      "Bash(docker build:*)",
+      "Bash(brew services:*)",
+      "Bash(sudo netstat:*)",
+      "Bash(docker start:*)",
+      "Bash(docker logs:*)",
+      "Bash(rm:*)"
     ],
     "deny": []
   }
