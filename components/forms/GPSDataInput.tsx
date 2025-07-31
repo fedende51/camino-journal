@@ -3,9 +3,11 @@
 import { useState } from 'react'
 
 interface GPSData {
-  source: 'strava' | 'garmin' | 'manual'
+  source: 'garmin' | 'manual'
   activityId?: string
   name: string
+  activityType?: string
+  date?: string
   startLocation: string
   endLocation: string
   distanceKm: number
@@ -19,7 +21,6 @@ interface GPSData {
     average: number
     max: number
   }
-  externalUrl?: string
   coordinates?: Array<{
     lat: number
     lng: number
@@ -36,6 +37,11 @@ interface ManualGPSInput {
   calories?: number
 }
 
+interface GarminCredentials {
+  email: string
+  password: string
+}
+
 interface GPSDataInputProps {
   date: string
   onGPSDataChange: (gpsData: GPSData | null) => void
@@ -45,11 +51,19 @@ interface GPSDataInputProps {
 export default function GPSDataInput({ date, onGPSDataChange, isLoading = false }: GPSDataInputProps) {
   const [inputMode, setInputMode] = useState<'search' | 'manual'>('search')
   const [isSearching, setIsSearching] = useState(false)
-  const [searchResults, setSearchResults] = useState<any>(null)
+  const [activities, setActivities] = useState<GPSData[]>([])
+  const [filteredActivities, setFilteredActivities] = useState<GPSData[]>([])
   const [selectedGPSData, setSelectedGPSData] = useState<GPSData | null>(null)
-  const [stravaConnected, setStravaConnected] = useState(false)
-  const [stravaToken, setStravaToken] = useState<string>('')
   const [searchError, setSearchError] = useState('')
+  const [showCredentialsModal, setShowCredentialsModal] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [selectedActivityType, setSelectedActivityType] = useState<string>('All')
+  
+  // Garmin credentials state
+  const [garminCredentials, setGarminCredentials] = useState<GarminCredentials>({
+    email: '',
+    password: ''
+  })
 
   // Manual input state
   const [manualData, setManualData] = useState<ManualGPSInput>({
@@ -61,71 +75,52 @@ export default function GPSDataInput({ date, onGPSDataChange, isLoading = false 
     calories: 0
   })
 
-  const handleSearchGPS = async () => {
+  const handleConnectGarmin = () => {
+    setShowCredentialsModal(true)
+    setSearchError('')
+  }
+
+  const handleGarminLogin = async () => {
+    if (!garminCredentials.email || !garminCredentials.password) {
+      setSearchError('Please enter both email and password')
+      return
+    }
+
     setIsSearching(true)
     setSearchError('')
-    setSearchResults(null)
+    setActivities([])
+    setFilteredActivities([])
 
     try {
-      const response = await fetch('/api/gps/search', {
+      const response = await fetch('/api/garmin/activities', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          date,
-          source: 'strava',
-          stravaAccessToken: stravaToken || undefined
+          email: garminCredentials.email,
+          password: garminCredentials.password,
+          days: 30
         })
       })
 
       const data = await response.json()
 
-      if (response.ok) {
-        if (data.gpsData) {
-          setSearchResults(data)
+      if (response.ok && data.success) {
+        if (data.activities && data.activities.length > 0) {
+          setActivities(data.activities)
+          setFilteredActivities(data.activities)
+          setShowCredentialsModal(false)
         } else {
-          setSearchError(data.message || 'No GPS data found for this date')
+          setSearchError('No activities found in the last 30 days')
         }
       } else {
-        setSearchError(data.error || 'Failed to search GPS data')
+        setSearchError(data.error || 'Failed to fetch activities from Garmin Connect')
       }
     } catch (error) {
-      setSearchError('Network error occurred while searching GPS data')
+      setSearchError('Network error occurred while connecting to Garmin')
     } finally {
       setIsSearching(false)
-    }
-  }
-
-  const handleConnectStrava = async () => {
-    try {
-      const response = await fetch('/api/auth/strava?baseUrl=' + window.location.origin)
-      const data = await response.json()
-      
-      if (data.authorizationUrl) {
-        // Open Strava authorization in popup
-        const popup = window.open(
-          data.authorizationUrl,
-          'strava-auth',
-          'width=600,height=600,scrollbars=yes,resizable=yes'
-        )
-
-        // Listen for popup messages
-        const handleMessage = (event: MessageEvent) => {
-          if (event.origin !== window.location.origin) return
-          
-          if (event.data.type === 'STRAVA_AUTH_SUCCESS') {
-            setStravaConnected(true)
-            setStravaToken(event.data.accessToken)
-            popup?.close()
-            window.removeEventListener('message', handleMessage)
-          }
-        }
-
-        window.addEventListener('message', handleMessage)
-      }
-    } catch (error) {
-      setSearchError('Failed to connect to Strava')
     }
   }
 
@@ -162,9 +157,42 @@ export default function GPSDataInput({ date, onGPSDataChange, isLoading = false 
     }
   }
 
+  // Filter activities by search query and activity type
+  const filterActivities = (query: string, activityType: string) => {
+    let filtered = activities
+
+    // Filter by activity type
+    if (activityType !== 'All') {
+      filtered = filtered.filter(activity => activity.activityType === activityType)
+    }
+
+    // Filter by search query (name, location)
+    if (query.trim()) {
+      const searchLower = query.toLowerCase()
+      filtered = filtered.filter(activity => 
+        activity.name.toLowerCase().includes(searchLower) ||
+        activity.startLocation.toLowerCase().includes(searchLower) ||
+        activity.endLocation.toLowerCase().includes(searchLower)
+      )
+    }
+
+    setFilteredActivities(filtered)
+  }
+
+  const handleSearchChange = (query: string) => {
+    setSearchQuery(query)
+    filterActivities(query, selectedActivityType)
+  }
+
+  const handleActivityTypeChange = (activityType: string) => {
+    setSelectedActivityType(activityType)
+    filterActivities(searchQuery, activityType)
+  }
+
   const clearGPSData = () => {
     setSelectedGPSData(null)
-    setSearchResults(null)
+    setActivities([])
+    setFilteredActivities([])
     setManualData({
       startLocation: '',
       endLocation: '',
@@ -174,6 +202,44 @@ export default function GPSDataInput({ date, onGPSDataChange, isLoading = false 
       calories: 0
     })
     onGPSDataChange(null)
+  }
+
+  const closeCredentialsModal = () => {
+    setShowCredentialsModal(false)
+    setGarminCredentials({ email: '', password: '' })
+  }
+
+  // Get unique activity types for filter buttons
+  const getUniqueActivityTypes = () => {
+    const types = activities.map(activity => activity.activityType || 'Unknown')
+    return ['All', ...Array.from(new Set(types))]
+  }
+
+  // Helper function to format date for display
+  const formatDate = (dateStr: string) => {
+    if (!dateStr) return 'Unknown'
+    try {
+      return new Date(dateStr).toLocaleDateString('en-US', { 
+        month: 'short', 
+        day: 'numeric',
+        weekday: 'short'
+      })
+    } catch {
+      return dateStr
+    }
+  }
+
+  // Helper function to format time for display
+  const formatTime = (dateTimeStr: string) => {
+    if (!dateTimeStr) return 'Unknown'
+    try {
+      return new Date(dateTimeStr).toLocaleTimeString('en-US', { 
+        hour: '2-digit', 
+        minute: '2-digit' 
+      })
+    } catch {
+      return dateTimeStr
+    }
   }
 
   return (
@@ -209,103 +275,187 @@ export default function GPSDataInput({ date, onGPSDataChange, isLoading = false 
       {/* Search Mode */}
       {inputMode === 'search' && (
         <div className="space-y-4">
-          {!stravaConnected ? (
+          {/* Connect Button or Activity Browser */}
+          {activities.length === 0 ? (
             <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-              <div className="w-12 h-12 mx-auto mb-4 bg-orange-100 rounded-full flex items-center justify-center">
-                <span className="text-xl">📊</span>
+              <div className="w-12 h-12 mx-auto mb-4 bg-blue-100 rounded-full flex items-center justify-center">
+                <span className="text-xl">🔗</span>
               </div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Connect to Strava</h3>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Connect to Garmin</h3>
               <p className="text-gray-500 mb-4">
-                Connect your Strava account to automatically import walking and hiking data for this date.
+                Connect your Garmin Connect account to browse your recent activities from the last 30 days.
               </p>
               <button
                 type="button"
-                onClick={handleConnectStrava}
-                className="bg-orange-600 hover:bg-orange-700 text-white px-6 py-2 rounded-md font-medium"
-                disabled={isLoading}
+                onClick={handleConnectGarmin}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md font-medium"
+                disabled={isLoading || isSearching}
               >
-                Connect Strava Account
+                {isSearching ? 'Connecting...' : 'Browse Recent Activities'}
               </button>
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="flex items-center justify-between p-4 bg-green-50 border border-green-200 rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
-                    <span className="text-white text-sm">✓</span>
-                  </div>
-                  <div>
-                    <p className="font-medium text-green-800">Strava Connected</p>
-                    <p className="text-sm text-green-600">Ready to search for activities</p>
-                  </div>
-                </div>
+              {/* Activity Browser Header */}
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-medium text-gray-900">
+                  Recent Activities ({activities.length} found)
+                </h3>
                 <button
                   type="button"
-                  onClick={handleSearchGPS}
-                  disabled={isSearching || isLoading}
-                  className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium disabled:opacity-50"
+                  onClick={() => {
+                    setActivities([])
+                    setFilteredActivities([])
+                    setSearchQuery('')
+                    setSelectedActivityType('All')
+                  }}
+                  className="text-sm text-gray-500 hover:text-gray-700"
                 >
-                  {isSearching ? 'Searching...' : 'Search Activities'}
+                  Disconnect
                 </button>
               </div>
 
-              {searchError && (
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                  <div className="text-yellow-800 text-sm">
-                    <strong>No activities found:</strong> {searchError}
+              {/* Filters */}
+              <div className="space-y-3">
+                {/* Search Input */}
+                <div>
+                  <input
+                    type="text"
+                    placeholder="Search activities by name or location..."
+                    value={searchQuery}
+                    onChange={(e) => handleSearchChange(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm"
+                  />
+                </div>
+
+                {/* Activity Type Filters */}
+                <div className="flex flex-wrap gap-2">
+                  {getUniqueActivityTypes().map((type) => (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => handleActivityTypeChange(type)}
+                      className={`px-3 py-1 rounded-full text-xs font-medium ${
+                        selectedActivityType === type
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      {type}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Activity Table */}
+              {filteredActivities.length > 0 ? (
+                <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Activity</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Route</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Distance</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Duration</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {filteredActivities.map((activity, index) => {
+                          const isCurrentDate = activity.date === date
+                          return (
+                            <tr 
+                              key={activity.activityId || index} 
+                              className={isCurrentDate ? 'bg-green-50' : 'hover:bg-gray-50'}
+                            >
+                              <td className="px-4 py-3 whitespace-nowrap text-sm">
+                                <div className={`font-medium ${isCurrentDate ? 'text-green-800' : 'text-gray-900'}`}>
+                                  {formatDate(activity.date || '')}
+                                </div>
+                                {isCurrentDate && (
+                                  <div className="text-xs text-green-600">Today&apos;s entry</div>
+                                )}
+                              </td>
+                              <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                {formatTime(activity.startTime.toString())}
+                              </td>
+                              <td className="px-4 py-3 whitespace-nowrap">
+                                <div className="flex items-center">
+                                  <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                                    activity.activityType === 'Walking' ? 'bg-blue-100 text-blue-800' :
+                                    activity.activityType === 'Hiking' ? 'bg-green-100 text-green-800' :
+                                    activity.activityType === 'Running' ? 'bg-red-100 text-red-800' :
+                                    activity.activityType === 'Cycling' ? 'bg-purple-100 text-purple-800' :
+                                    'bg-gray-100 text-gray-800'
+                                  }`}>
+                                    {activity.activityType || 'Activity'}
+                                  </span>
+                                </div>
+                                <div className="text-sm text-gray-500 mt-1">{activity.name}</div>
+                              </td>
+                              <td className="px-4 py-3 text-sm text-gray-900">
+                                <div className="max-w-xs truncate">
+                                  {activity.startLocation} → {activity.endLocation}
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                {activity.distanceKm} km
+                              </td>
+                              <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                                {Math.floor(activity.durationMinutes / 60)}h {activity.durationMinutes % 60}m
+                              </td>
+                              <td className="px-4 py-3 whitespace-nowrap text-sm">
+                                <button
+                                  type="button"
+                                  onClick={() => handleSelectGPSData(activity)}
+                                  className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-xs font-medium"
+                                  disabled={isLoading}
+                                >
+                                  Select
+                                </button>
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
                   </div>
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  <p>No activities match your current filters.</p>
                   <button
                     type="button"
-                    onClick={() => setInputMode('manual')}
+                    onClick={() => {
+                      setSearchQuery('')
+                      setSelectedActivityType('All')
+                      setFilteredActivities(activities)
+                    }}
                     className="mt-2 text-blue-600 hover:text-blue-800 text-sm font-medium"
                   >
-                    Add GPS data manually instead →
+                    Clear filters
                   </button>
                 </div>
               )}
+            </div>
+          )}
 
-              {searchResults && searchResults.gpsData && (
-                <div className="bg-white border border-gray-200 rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className="font-medium text-gray-900">Found Activity</h4>
-                    <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
-                      {searchResults.source === 'strava' ? 'Strava' : 'Garmin'}
-                    </span>
-                  </div>
-                  
-                  <div className="space-y-2 text-sm">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <span className="text-gray-500">Route:</span>
-                        <div className="font-medium">{searchResults.gpsData.startLocation} → {searchResults.gpsData.endLocation}</div>
-                      </div>
-                      <div>
-                        <span className="text-gray-500">Distance:</span>
-                        <div className="font-medium">{searchResults.gpsData.distanceKm} km</div>
-                      </div>
-                      <div>
-                        <span className="text-gray-500">Duration:</span>
-                        <div className="font-medium">{Math.floor(searchResults.gpsData.durationMinutes / 60)}h {searchResults.gpsData.durationMinutes % 60}m</div>
-                      </div>
-                      <div>
-                        <span className="text-gray-500">Elevation:</span>
-                        <div className="font-medium">+{searchResults.gpsData.elevationGainM}m</div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 flex justify-end space-x-2">
-                    <button
-                      type="button"
-                      onClick={() => handleSelectGPSData(searchResults.gpsData)}
-                      className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium"
-                      disabled={isLoading}
-                    >
-                      Use This Data
-                    </button>
-                  </div>
-                </div>
-              )}
+          {/* Error Display */}
+          {searchError && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+              <div className="text-yellow-800 text-sm">
+                <strong>Error:</strong> {searchError}
+              </div>
+              <button
+                type="button"
+                onClick={() => setInputMode('manual')}
+                className="mt-2 text-blue-600 hover:text-blue-800 text-sm font-medium"
+              >
+                Add GPS data manually instead →
+              </button>
             </div>
           )}
         </div>
@@ -324,7 +474,7 @@ export default function GPSDataInput({ date, onGPSDataChange, isLoading = false 
                 value={manualData.startLocation}
                 onChange={(e) => handleManualDataChange('startLocation', e.target.value)}
                 placeholder="e.g., Saint-Jean-Pied-de-Port"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-900"
                 disabled={isLoading}
               />
             </div>
@@ -338,7 +488,7 @@ export default function GPSDataInput({ date, onGPSDataChange, isLoading = false 
                 value={manualData.endLocation}
                 onChange={(e) => handleManualDataChange('endLocation', e.target.value)}
                 placeholder="e.g., Roncesvalles"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-900"
                 disabled={isLoading}
               />
             </div>
@@ -354,7 +504,7 @@ export default function GPSDataInput({ date, onGPSDataChange, isLoading = false 
                 value={manualData.distanceKm || ''}
                 onChange={(e) => handleManualDataChange('distanceKm', parseFloat(e.target.value) || 0)}
                 placeholder="25.5"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-900"
                 disabled={isLoading}
               />
             </div>
@@ -369,7 +519,7 @@ export default function GPSDataInput({ date, onGPSDataChange, isLoading = false 
                 value={manualData.durationMinutes || ''}
                 onChange={(e) => handleManualDataChange('durationMinutes', parseInt(e.target.value) || 0)}
                 placeholder="480"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-900"
                 disabled={isLoading}
               />
             </div>
@@ -384,7 +534,7 @@ export default function GPSDataInput({ date, onGPSDataChange, isLoading = false 
                 value={manualData.elevationGainM || ''}
                 onChange={(e) => handleManualDataChange('elevationGainM', parseInt(e.target.value) || 0)}
                 placeholder="800"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-900"
                 disabled={isLoading}
               />
             </div>
@@ -399,7 +549,7 @@ export default function GPSDataInput({ date, onGPSDataChange, isLoading = false 
                 value={manualData.calories || ''}
                 onChange={(e) => handleManualDataChange('calories', parseInt(e.target.value) || 0)}
                 placeholder="2000"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-900"
                 disabled={isLoading}
               />
             </div>
@@ -414,8 +564,7 @@ export default function GPSDataInput({ date, onGPSDataChange, isLoading = false 
             <h4 className="font-medium text-green-800">GPS Data Selected</h4>
             <div className="flex items-center space-x-2">
               <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
-                {selectedGPSData.source === 'manual' ? 'Manual Entry' : 
-                 selectedGPSData.source === 'strava' ? 'Strava' : 'Garmin'}
+                {selectedGPSData.source === 'manual' ? 'Manual Entry' : 'Garmin'}
               </span>
               <button
                 type="button"
@@ -451,6 +600,78 @@ export default function GPSDataInput({ date, onGPSDataChange, isLoading = false 
           
           <div className="mt-2 text-sm text-green-700">
             <strong>Route:</strong> {selectedGPSData.startLocation} → {selectedGPSData.endLocation}
+          </div>
+        </div>
+      )}
+
+      {/* Garmin Credentials Modal */}
+      {showCredentialsModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+          <div className="bg-white p-8 rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div className="text-center mb-6">
+              <div className="w-12 h-12 mx-auto mb-4 bg-blue-100 rounded-full flex items-center justify-center">
+                <span className="text-blue-600 text-xl">🔐</span>
+              </div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">
+                Connect to Garmin
+              </h3>
+              <p className="text-sm text-gray-500">
+                Enter your Garmin Connect credentials to fetch activities for {date}
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  value={garminCredentials.email}
+                  onChange={(e) => setGarminCredentials(prev => ({ ...prev, email: e.target.value }))}
+                  placeholder="your-email@example.com"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                  disabled={isSearching}
+                  autoComplete="email"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Password
+                </label>
+                <input
+                  type="password"
+                  value={garminCredentials.password}
+                  onChange={(e) => setGarminCredentials(prev => ({ ...prev, password: e.target.value }))}
+                  placeholder="Your Garmin Connect password"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                  disabled={isSearching}
+                  autoComplete="current-password"
+                />
+              </div>
+
+              <div className="text-xs text-gray-500">
+                🔒 Your credentials are used only to fetch activity data and are not stored.
+              </div>
+            </div>
+
+            <div className="flex justify-center space-x-4 mt-6">
+              <button
+                onClick={closeCredentialsModal}
+                disabled={isSearching}
+                className="px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-700 rounded-md text-sm font-medium disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleGarminLogin}
+                disabled={isSearching}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium disabled:opacity-50"
+              >
+                {isSearching ? 'Connecting...' : 'Fetch Activities'}
+              </button>
+            </div>
           </div>
         </div>
       )}

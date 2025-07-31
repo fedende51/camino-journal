@@ -42,3 +42,8 @@ next-env.d.ts
 
 # prisma
 /prisma/migrations
+
+# python virtual environment
+/venv
+__pycache__/
+*.pyc

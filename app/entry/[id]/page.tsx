@@ -268,12 +268,10 @@ export default async function EntryPage({ params }: EntryPageProps) {
                 <h3 className="text-lg font-medium text-gray-900">🗺️ Route Information</h3>
                 <div className="flex items-center space-x-2">
                   <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                    entry.gpsData.source === 'strava' ? 'bg-orange-100 text-orange-800' :
                     entry.gpsData.source === 'garmin' ? 'bg-blue-100 text-blue-800' :
                     'bg-gray-100 text-gray-800'
                   }`}>
-                    {entry.gpsData.source === 'strava' ? 'Strava' :
-                     entry.gpsData.source === 'garmin' ? 'Garmin' : 'Manual Entry'}
+                    {entry.gpsData.source === 'garmin' ? 'Garmin' : 'Manual Entry'}
                   </span>
                 </div>
               </div>
@@ -348,12 +346,9 @@ export default async function EntryPage({ params }: EntryPageProps) {
                     href={entry.gpsData.externalUrl}
                     target="_blank"
                     rel="noopener noreferrer" 
-                    className={`inline-flex items-center text-sm font-medium hover:underline ${
-                      entry.gpsData.source === 'strava' ? 'text-orange-600 hover:text-orange-800' :
-                      'text-blue-600 hover:text-blue-800'
-                    }`}
+                    className="inline-flex items-center text-sm font-medium hover:underline text-blue-600 hover:text-blue-800"
                   >
-                    View on {entry.gpsData.source === 'strava' ? 'Strava' : 'Garmin Connect'} →
+                    View on {entry.gpsData.source === 'garmin' ? 'Garmin Connect' : 'External Link'} →
                   </a>
                 </div>
               )}

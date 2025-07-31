@@ -45,7 +45,7 @@ export default function CreateEntryPage() {
 
   // GPS data state
   interface GPSData {
-    source: 'strava' | 'garmin' | 'manual'
+    source: 'garmin' | 'manual'
     activityId?: string
     name: string
     startLocation: string
@@ -566,8 +566,7 @@ export default function CreateEntryPage() {
                 <h2 className="text-lg font-medium text-gray-900">Route Data</h2>
                 {gpsData && (
                   <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                    {gpsData.source === 'manual' ? 'Manual Entry' : 
-                     gpsData.source === 'strava' ? 'From Strava' : 'From Garmin'}
+                    {gpsData.source === 'manual' ? 'Manual Entry' : 'From Garmin'}
                   </span>
                 )}
               </div>
