@@ -1,11 +1,172 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { spawn } from 'child_process'
-import path from 'path'
 
 interface GarminActivityRequest {
   email: string
   password: string
   days?: number
+}
+
+interface ProcessedActivity {
+  activityId: string
+  name: string
+  activityType: string
+  date: string
+  startLocation: string
+  endLocation: string
+  distanceKm: number
+  elevationGainM: number
+  durationMinutes: number
+  averageSpeedKmh: number
+  startTime: string
+  endTime: string
+  calories?: number
+  heartRateData?: {
+    average: number
+    max: number
+  }
+}
+
+// Activity type mapping
+function getActivityTypeDisplay(activity: any): string {
+  const activityType = activity.activityType || {}
+  const typeKey = (activityType.typeKey || '').toLowerCase()
+  const typeName = (activityType.typeDisplayName || '').toLowerCase()
+  const activityName = (activity.activityName || '').toLowerCase()
+  
+  const typeMapping: { [key: string]: string } = {
+    'walking': 'Walking',
+    'hiking': 'Hiking', 
+    'running': 'Running',
+    'cycling': 'Cycling',
+    'trekking': 'Trekking',
+    'trail_running': 'Trail Running',
+    'road_biking': 'Road Cycling',
+    'mountain_biking': 'Mountain Biking',
+    'fitness_walking': 'Fitness Walking',
+    'cardio': 'Cardio',
+    'cardiovascular': 'Cardio',
+    'strength': 'Strength Training',
+    'training': 'Training',
+    'workout': 'Workout',
+    'exercise': 'Exercise'
+  }
+  
+  // Check exact type key matches first
+  if (typeMapping[typeKey]) {
+    return typeMapping[typeKey]
+  }
+  
+  // Check for keywords in type key, name, or activity name
+  for (const [keyword, displayName] of Object.entries(typeMapping)) {
+    const keywordClean = keyword.replace('_', ' ')
+    if (typeKey.includes(keywordClean) || typeName.includes(keywordClean) || activityName.includes(keywordClean)) {
+      return displayName
+    }
+  }
+  
+  return activityType.typeDisplayName || 'Other Activity'
+}
+
+// Check if activity is relevant for journal entries
+function isRelevantActivity(activity: any): boolean {
+  const activityType = activity.activityType || {}
+  const typeKey = (activityType.typeKey || '').toLowerCase()
+  const typeName = (activityType.typeDisplayName || '').toLowerCase()
+  const activityName = (activity.activityName || '').toLowerCase()
+  
+  const relevantKeywords = [
+    'walk', 'walking', 'hike', 'hiking', 'trekking', 'trek',
+    'run', 'running', 'jog', 'jogging', 'cycle', 'cycling', 'bike', 'biking',
+    'pedestrian', 'foot', 'trail', 'ramble', 'stroll', 'fitness',
+    'cardio', 'cardiovascular', 'aerobic', 'exercise', 'workout',
+    'elliptical', 'treadmill', 'indoor', 'gym', 'strength', 'training'
+  ]
+  
+  // Check activity type key, display name, and activity name
+  for (const keyword of relevantKeywords) {
+    if (typeKey.includes(keyword) || typeName.includes(keyword) || activityName.includes(keyword)) {
+      return true
+    }
+  }
+  
+  return false
+}
+
+// Simple reverse geocoding fallback
+function getLocationName(lat?: number, lng?: number): string {
+  if (!lat || !lng) return 'Unknown Location'
+  // For now, return coordinates as location
+  // In production, you might want to add a geocoding service
+  return `${lat.toFixed(4)}, ${lng.toFixed(4)}`
+}
+
+// Process raw Garmin activity data
+function processActivity(activity: any): ProcessedActivity {
+  const activityId = String(activity.activityId || '')
+  const name = activity.activityName || 'Unnamed Activity'
+  const distanceMeters = activity.distance || 0
+  const durationSeconds = activity.duration || 0
+  const elevationGain = activity.elevationGain || 0
+  const startTimeLocal = activity.startTimeLocal || ''
+  
+  // Calculate derived values
+  const distanceKm = Math.round((distanceMeters / 1000) * 100) / 100
+  const durationMinutes = Math.round(durationSeconds / 60)
+  const elevationGainM = Math.round(elevationGain)
+  
+  // Calculate average speed
+  let averageSpeedKmh = 0
+  if (distanceMeters && durationSeconds) {
+    const averageSpeedMs = distanceMeters / durationSeconds
+    averageSpeedKmh = Math.round(averageSpeedMs * 3.6 * 100) / 100
+  }
+  
+  // Parse start time and calculate end time
+  let startTime = startTimeLocal
+  let endTime = startTimeLocal
+  let date = ''
+  
+  if (startTimeLocal && durationSeconds) {
+    try {
+      const startDate = new Date(startTimeLocal)
+      const endDate = new Date(startDate.getTime() + durationSeconds * 1000)
+      startTime = startDate.toISOString()
+      endTime = endDate.toISOString()
+      date = startDate.toISOString().split('T')[0]
+    } catch (error) {
+      console.error('Error parsing date:', error)
+    }
+  }
+  
+  // Get locations
+  const startLocation = getLocationName(activity.startLatitude, activity.startLongitude)
+  const endLocation = getLocationName(activity.endLatitude, activity.endLongitude)
+  
+  // Heart rate data
+  let heartRateData = undefined
+  if (activity.averageHR) {
+    heartRateData = {
+      average: activity.averageHR,
+      max: activity.maxHR || activity.averageHR
+    }
+  }
+  
+  return {
+    activityId,
+    name,
+    activityType: getActivityTypeDisplay(activity),
+    date,
+    startLocation,
+    endLocation,
+    distanceKm,
+    elevationGainM,
+    durationMinutes,
+    averageSpeedKmh,
+    startTime,
+    endTime,
+    calories: activity.calories,
+    heartRateData
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -30,97 +191,97 @@ export async function POST(request: NextRequest) {
 
     console.log(`Fetching Garmin activities for last ${days} days...`)
 
-    // Get the path to the Python script and virtual environment
-    const scriptPath = path.join(process.cwd(), 'scripts', 'garmin_fetch.py')
-    const venvPython = path.join(process.cwd(), 'venv', 'bin', 'python3')
+    try {
+      // Dynamic import to avoid build issues
+      const { GarminConnect } = await import('garmin-connect')
+      
+      // Create Garmin Connect client
+      const client = new GarminConnect({
+        username: email,
+        password: password
+      })
 
-    // Execute Python script using virtual environment
-    const pythonProcess = spawn(venvPython, [
-      scriptPath,
-      '--email', email,
-      '--password', password,
-      '--days', days.toString()
-    ], {
-      timeout: 120000, // 120 second timeout for 30 days of data
-      stdio: ['pipe', 'pipe', 'pipe']
-    })
+      // Login to Garmin Connect
+      await client.login()
+      console.log('Successfully logged into Garmin Connect')
 
-    let stdout = ''
-    let stderr = ''
+      // Calculate date range
+      const endDate = new Date()
+      const startDate = new Date()
+      startDate.setDate(endDate.getDate() - days)
 
-    pythonProcess.stdout.on('data', (data) => {
-      stdout += data.toString()
-    })
+      const startDateStr = startDate.toISOString().split('T')[0]
+      const endDateStr = endDate.toISOString().split('T')[0]
 
-    pythonProcess.stderr.on('data', (data) => {
-      stderr += data.toString()
-    })
+      console.log(`Fetching activities from ${startDateStr} to ${endDateStr}...`)
 
-    // Wait for process to complete
-    const result = await new Promise<{ success: boolean; data?: any; error?: string }>((resolve) => {
-      pythonProcess.on('close', (code) => {
-        if (code === 0) {
-          try {
-            // Parse JSON output from Python script
-            const output = JSON.parse(stdout.trim())
-            resolve({ success: true, data: output })
-          } catch (parseError) {
-            console.error('Failed to parse Python script output:', parseError)
-            console.error('Raw output:', stdout)
-            resolve({ 
-              success: false, 
-              error: 'Failed to parse activity data' 
-            })
+      // Get activities for the date range
+      // The library might expect different parameters, let's try with limit and offset
+      const activities = await client.getActivities(0, days * 10) // Get more activities than days to ensure coverage
+      
+      console.log(`Found ${activities?.length || 0} total activities`)
+
+      if (!activities || activities.length === 0) {
+        return NextResponse.json({
+          success: true,
+          activities: [],
+          dateRange: {
+            start: startDateStr,
+            end: endDateStr
           }
-        } else {
-          console.error('Python script failed with code:', code)
-          console.error('stderr:', stderr)
-          
-          // Try to parse error from stdout if it's JSON
-          try {
-            const errorOutput = JSON.parse(stdout.trim())
-            resolve({ 
-              success: false, 
-              error: errorOutput.error || 'Python script execution failed' 
-            })
-          } catch {
-            resolve({ 
-              success: false, 
-              error: stderr || 'Failed to execute Garmin data fetch' 
-            })
-          }
+        })
+      }
+
+      // Filter for relevant activities within date range and process them
+      const relevantActivities: ProcessedActivity[] = []
+      for (const activity of activities) {
+        // Check if activity is within our date range
+        const activityDate = new Date(activity.startTimeLocal || activity.startTimeGMT)
+        if (activityDate >= startDate && activityDate <= endDate && isRelevantActivity(activity)) {
+          const processedActivity = processActivity(activity)
+          relevantActivities.push(processedActivity)
+        }
+      }
+
+      // Sort activities by date (most recent first)
+      relevantActivities.sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime())
+
+      console.log(`Found ${relevantActivities.length} relevant activities`)
+
+      return NextResponse.json({
+        success: true,
+        activities: relevantActivities,
+        dateRange: {
+          start: startDateStr,
+          end: endDateStr
         }
       })
 
-      pythonProcess.on('error', (error) => {
-        console.error('Python process error:', error)
-        resolve({ 
-          success: false, 
-          error: 'Failed to start Python process. Ensure Python 3 is installed.' 
-        })
-      })
-
-      // Handle timeout
-      setTimeout(() => {
-        pythonProcess.kill('SIGTERM')
-        resolve({ 
-          success: false, 
-          error: 'Request timeout. Garmin Connect may be slow to respond.' 
-        })
-      }, 115000) // Kill 5 seconds before the spawn timeout
-    })
-
-    if (result.success && result.data) {
-      return NextResponse.json(result.data)
-    } else {
-      return NextResponse.json(
-        { success: false, error: result.error },
-        { status: 500 }
-      )
+    } catch (garminError: any) {
+      console.error('Garmin Connect error:', garminError)
+      
+      // Handle common authentication errors
+      const errorMessage = garminError.message || String(garminError)
+      if (errorMessage.includes('401') || errorMessage.includes('authentication') || errorMessage.includes('login')) {
+        return NextResponse.json(
+          { success: false, error: 'Invalid Garmin Connect credentials. Please check your email and password.' },
+          { status: 400 }
+        )
+      } else if (errorMessage.includes('network') || errorMessage.includes('timeout')) {
+        return NextResponse.json(
+          { success: false, error: 'Unable to connect to Garmin Connect. Please check your internet connection.' },
+          { status: 500 }
+        )
+      } else {
+        return NextResponse.json(
+          { success: false, error: `Error fetching activities: ${errorMessage}` },
+          { status: 500 }
+        )
+      }
     }
 
   } catch (error) {
-    console.error('Garmin API error:', error)
+    console.error('Garmin API route error:', error)
     
     return NextResponse.json(
       { 
