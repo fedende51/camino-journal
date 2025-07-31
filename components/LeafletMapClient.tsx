@@ -44,19 +44,36 @@ export default function LeafletMapClient({ entries }: LeafletMapClientProps) {
     if (!mapRef.current || mapInstanceRef.current || typeof window === 'undefined') return
 
     // Initialize map centered on Spain (Camino region)
-    const map = L.map(mapRef.current).setView([42.8, -2.5], 7)
+    const map = L.map(mapRef.current, {
+      zoomControl: true,
+      scrollWheelZoom: true,
+      doubleClickZoom: true,
+      boxZoom: true,
+      keyboard: true,
+      dragging: true,
+      touchZoom: true
+    }).setView([42.8, -2.5], 7)
+    
     mapInstanceRef.current = map
 
-    // Add OpenStreetMap tiles
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap contributors'
+    // Add OpenStreetMap tiles with improved configuration
+    const tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors',
+      maxZoom: 19,
+      subdomains: ['a', 'b', 'c'],
+      crossOrigin: true
     }).addTo(map)
+
+    // Force map to invalidate its size after tiles start loading
+    setTimeout(() => {
+      map.invalidateSize()
+    }, 100)
 
     // Filter entries that have GPS data
     const entriesWithGPS = entries.filter(entry => entry.gpsData)
 
     if (entriesWithGPS.length === 0) {
-      // Show message if no GPS data - add a simple marker instead
+      // Show message if no GPS data
       const noDataMarker = L.marker([42.8, -2.5]).addTo(map)
       noDataMarker.bindPopup(`
         <div class="text-center p-2">
