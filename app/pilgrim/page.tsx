@@ -13,6 +13,7 @@ interface Entry {
   title?: string
   content: string
   isPrivate: boolean
+  isDraft: boolean
   createdAt: string
   user: {
     name?: string
@@ -237,6 +238,11 @@ export default function PilgrimDashboard() {
                         </p>
                       </div>
                       <div className="flex items-center space-x-2">
+                        {entry.isDraft && (
+                          <span className="px-2 py-1 rounded-full text-xs bg-yellow-100 text-yellow-800">
+                            Draft
+                          </span>
+                        )}
                         <span className={`px-2 py-1 rounded-full text-xs ${
                           entry.isPrivate
                             ? 'bg-gray-100 text-gray-800'
@@ -271,8 +277,17 @@ export default function PilgrimDashboard() {
                         )}
                       </div>
                       <div className="space-x-2">
-                        <button className="text-blue-600 hover:text-blue-800 text-sm font-medium">
+                        <Link
+                          href={`/pilgrim/edit/${entry.id}`}
+                          className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                        >
                           Edit
+                        </Link>
+                        <button
+                          onClick={() => setDeleteConfirm(entry.id)}
+                          className="text-red-600 hover:text-red-800 text-sm font-medium"
+                        >
+                          Delete
                         </button>
                         <Link 
                           href={`/entry/${entry.id}`}
@@ -288,16 +303,42 @@ export default function PilgrimDashboard() {
             )}
           </div>
 
-          {/* Status Message */}
-          <div className="mt-8 bg-green-50 border border-green-200 rounded-lg p-6">
-            <h2 className="text-lg font-semibold text-green-800 mb-2">
-              ✅ Phase 2B: GPS Integration Complete
-            </h2>
-            <p className="text-green-700">
-              Your Camino journal now supports audio transcription, photo galleries, and GPS route data from Strava/Garmin! Enhanced features coming in Phase 2C.
-            </p>
-          </div>
         </div>
+
+        {/* Delete Confirmation Modal */}
+        {deleteConfirm && (
+          <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+            <div className="bg-white p-8 rounded-lg shadow-xl max-w-md w-full mx-4">
+              <div className="text-center">
+                <div className="w-12 h-12 mx-auto mb-4 bg-red-100 rounded-full flex items-center justify-center">
+                  <span className="text-red-600 text-xl">⚠️</span>
+                </div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                  Delete Entry
+                </h3>
+                <p className="text-sm text-gray-500 mb-6">
+                  Are you sure you want to delete this entry? This action cannot be undone.
+                </p>
+                <div className="flex justify-center space-x-4">
+                  <button
+                    onClick={() => setDeleteConfirm(null)}
+                    disabled={isDeleting}
+                    className="px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-700 rounded-md text-sm font-medium disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => handleDelete(deleteConfirm)}
+                    disabled={isDeleting}
+                    className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm font-medium disabled:opacity-50"
+                  >
+                    {isDeleting ? 'Deleting...' : 'Delete'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   )
