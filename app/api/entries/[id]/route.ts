@@ -5,10 +5,10 @@ import { prisma } from '@/lib/prisma'
 // GET /api/entries/[id] - Get specific entry
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params
+    const { id } = await params
     const session = await auth()
 
     const entry = await prisma.entry.findUnique({
@@ -54,10 +54,10 @@ export async function GET(
 // PUT /api/entries/[id] - Update entry
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params
+    const { id } = await params
     const session = await auth()
     
     if (!session || session.user.role !== 'PILGRIM') {
@@ -138,10 +138,10 @@ export async function PUT(
 // DELETE /api/entries/[id] - Delete entry
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params
+    const { id } = await params
     const session = await auth()
     
     if (!session || session.user.role !== 'PILGRIM') {

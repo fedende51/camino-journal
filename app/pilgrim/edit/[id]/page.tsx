@@ -39,7 +39,7 @@ interface Entry {
   }
 }
 
-export default function EditEntryPage({ params }: { params: { id: string } }) {
+export default function EditEntryPage({ params }: { params: Promise<{ id: string }> }) {
   const { data: session } = useSession()
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
@@ -61,7 +61,8 @@ export default function EditEntryPage({ params }: { params: { id: string } }) {
   useEffect(() => {
     const fetchEntry = async () => {
       try {
-        const response = await fetch(`/api/entries/${params.id}`)
+        const resolvedParams = await params
+        const response = await fetch(`/api/entries/${resolvedParams.id}`)
         const data = await response.json()
         
         if (!response.ok) {
@@ -87,10 +88,8 @@ export default function EditEntryPage({ params }: { params: { id: string } }) {
       }
     }
 
-    if (params.id) {
-      fetchEntry()
-    }
-  }, [params.id])
+    fetchEntry()
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent, asDraft = false) => {
     e.preventDefault()
@@ -98,7 +97,8 @@ export default function EditEntryPage({ params }: { params: { id: string } }) {
     setError('')
 
     try {
-      const response = await fetch(`/api/entries/${params.id}`, {
+      const resolvedParams = await params
+      const response = await fetch(`/api/entries/${resolvedParams.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

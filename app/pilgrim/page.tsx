@@ -35,6 +35,8 @@ export default function PilgrimDashboard() {
   const router = useRouter()
   const [entries, setEntries] = useState<Entry[]>([])
   const [isLoadingEntries, setIsLoadingEntries] = useState(true)
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   const fetchEntries = useCallback(async () => {
     if (!session?.user.id) return
@@ -51,6 +53,27 @@ export default function PilgrimDashboard() {
       setIsLoadingEntries(false)
     }
   }, [session?.user.id])
+
+  const handleDelete = async (entryId: string) => {
+    setIsDeleting(true)
+    try {
+      const response = await fetch(`/api/entries/${entryId}`, {
+        method: 'DELETE'
+      })
+      
+      if (response.ok) {
+        // Remove entry from local state
+        setEntries(prev => prev.filter(entry => entry.id !== entryId))
+        setDeleteConfirm(null)
+      } else {
+        console.error('Failed to delete entry')
+      }
+    } catch (error) {
+      console.error('Error deleting entry:', error)
+    } finally {
+      setIsDeleting(false)
+    }
+  }
 
   useEffect(() => {
     if (status === 'loading') return
