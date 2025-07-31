@@ -92,14 +92,6 @@ export default function GPSDataInput({ date, onGPSDataChange, isLoading = false 
       if (response.ok && data.hasCredentials) {
         setHasStoredCredentials(true)
         setStoredGarminEmail(data.garminEmail)
-        
-        // Automatically fetch activities if we have stored credentials
-        // but only if we don't already have activities loaded
-        if (activities.length === 0 && inputMode === 'search') {
-          setTimeout(() => {
-            fetchActivitiesWithStoredCredentials()
-          }, 100) // Small delay to ensure state is updated
-        }
       }
     } catch (error) {
       console.error('Error checking stored credentials:', error)
