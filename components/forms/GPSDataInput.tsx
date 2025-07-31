@@ -113,9 +113,7 @@ export default function GPSDataInput({ date, onGPSDataChange, isLoading = false 
 
   const fetchActivitiesWithStoredCredentials = async () => {
     setIsSearching(true)
-    setSearchError('')
-    setActivities([])
-    setFilteredActivities([])
+    resetToInitialState()
 
     try {
       const response = await fetch('/api/garmin/activities', {
@@ -131,7 +129,7 @@ export default function GPSDataInput({ date, onGPSDataChange, isLoading = false 
       const data = await response.json()
 
       if (response.ok && data.success) {
-        if (data.activities && data.activities.length > 0) {
+        if (data.activities?.length > 0) {
           setActivities(data.activities)
           setFilteredActivities(data.activities)
         } else {
@@ -140,7 +138,7 @@ export default function GPSDataInput({ date, onGPSDataChange, isLoading = false 
       } else {
         setSearchError(data.error || 'Failed to fetch activities from Garmin Connect')
         if (data.error?.includes('credentials')) {
-          // If credentials are invalid, remove them and show modal
+          // If credentials are invalid, remove them
           setHasStoredCredentials(false)
           setStoredGarminEmail('')
         }
@@ -284,10 +282,17 @@ export default function GPSDataInput({ date, onGPSDataChange, isLoading = false 
     filterActivities(searchQuery, activityType)
   }
 
-  const clearGPSData = () => {
-    setSelectedGPSData(null)
+  const resetToInitialState = () => {
     setActivities([])
     setFilteredActivities([])
+    setSearchQuery('')
+    setSelectedActivityType('All')
+    setSearchError('')
+  }
+
+  const clearGPSData = () => {
+    setSelectedGPSData(null)
+    resetToInitialState()
     setManualData({
       startLocation: '',
       endLocation: '',
@@ -312,9 +317,7 @@ export default function GPSDataInput({ date, onGPSDataChange, isLoading = false 
       
       setHasStoredCredentials(false)
       setStoredGarminEmail('')
-      setActivities([])
-      setFilteredActivities([])
-      setSearchError('')
+      resetToInitialState()
     } catch (error) {
       console.error('Failed to disconnect Garmin:', error)
     }
@@ -453,12 +456,7 @@ export default function GPSDataInput({ date, onGPSDataChange, isLoading = false 
                 <div className="flex items-center space-x-3">
                   <button
                     type="button"
-                    onClick={() => {
-                      setActivities([])
-                      setFilteredActivities([])
-                      setSearchQuery('')
-                      setSelectedActivityType('All')
-                    }}
+                    onClick={resetToInitialState}
                     className="text-sm text-gray-500 hover:text-gray-700"
                   >
                     Close

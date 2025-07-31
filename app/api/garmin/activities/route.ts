@@ -1,15 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import CryptoJS from 'crypto-js'
-
-// Encryption key - in production, this should be in environment variables
-const ENCRYPTION_KEY = process.env.GARMIN_ENCRYPTION_KEY || 'default-encryption-key-change-in-production'
-
-function decryptPassword(encryptedPassword: string): string {
-  const bytes = CryptoJS.AES.decrypt(encryptedPassword, ENCRYPTION_KEY)
-  return bytes.toString(CryptoJS.enc.Utf8)
-}
+import { decryptPassword } from '@/lib/utils/encryption'
 
 interface GarminActivityRequest {
   email?: string
@@ -37,38 +29,38 @@ interface ProcessedActivity {
   }
 }
 
-// Activity type mapping
-function getActivityTypeDisplay(activity: any): string {
+// Activity type mapping constants
+const ACTIVITY_TYPE_MAPPING: Record<string, string> = {
+  'walking': 'Walking',
+  'hiking': 'Hiking', 
+  'running': 'Running',
+  'cycling': 'Cycling',
+  'trekking': 'Trekking',
+  'trail_running': 'Trail Running',
+  'road_biking': 'Road Cycling',
+  'mountain_biking': 'Mountain Biking',
+  'fitness_walking': 'Fitness Walking',
+  'cardio': 'Cardio',
+  'cardiovascular': 'Cardio',
+  'strength': 'Strength Training',
+  'training': 'Training',
+  'workout': 'Workout',
+  'exercise': 'Exercise'
+}
+
+const getActivityTypeDisplay = (activity: any): string => {
   const activityType = activity.activityType || {}
   const typeKey = (activityType.typeKey || '').toLowerCase()
   const typeName = (activityType.typeDisplayName || '').toLowerCase()
   const activityName = (activity.activityName || '').toLowerCase()
   
-  const typeMapping: { [key: string]: string } = {
-    'walking': 'Walking',
-    'hiking': 'Hiking', 
-    'running': 'Running',
-    'cycling': 'Cycling',
-    'trekking': 'Trekking',
-    'trail_running': 'Trail Running',
-    'road_biking': 'Road Cycling',
-    'mountain_biking': 'Mountain Biking',
-    'fitness_walking': 'Fitness Walking',
-    'cardio': 'Cardio',
-    'cardiovascular': 'Cardio',
-    'strength': 'Strength Training',
-    'training': 'Training',
-    'workout': 'Workout',
-    'exercise': 'Exercise'
-  }
-  
   // Check exact type key matches first
-  if (typeMapping[typeKey]) {
-    return typeMapping[typeKey]
+  if (ACTIVITY_TYPE_MAPPING[typeKey]) {
+    return ACTIVITY_TYPE_MAPPING[typeKey]
   }
   
   // Check for keywords in type key, name, or activity name
-  for (const [keyword, displayName] of Object.entries(typeMapping)) {
+  for (const [keyword, displayName] of Object.entries(ACTIVITY_TYPE_MAPPING)) {
     const keywordClean = keyword.replace('_', ' ')
     if (typeKey.includes(keywordClean) || typeName.includes(keywordClean) || activityName.includes(keywordClean)) {
       return displayName
@@ -78,41 +70,32 @@ function getActivityTypeDisplay(activity: any): string {
   return activityType.typeDisplayName || 'Other Activity'
 }
 
-// Check if activity is relevant for journal entries
-function isRelevantActivity(activity: any): boolean {
+// Relevant activity keywords for journal entries
+const RELEVANT_KEYWORDS = [
+  'walk', 'walking', 'hike', 'hiking', 'trekking', 'trek',
+  'run', 'running', 'jog', 'jogging', 'cycle', 'cycling', 'bike', 'biking',
+  'pedestrian', 'foot', 'trail', 'ramble', 'stroll', 'fitness',
+  'cardio', 'cardiovascular', 'aerobic', 'exercise', 'workout',
+  'elliptical', 'treadmill', 'indoor', 'gym', 'strength', 'training'
+]
+
+const isRelevantActivity = (activity: any): boolean => {
   const activityType = activity.activityType || {}
   const typeKey = (activityType.typeKey || '').toLowerCase()
   const typeName = (activityType.typeDisplayName || '').toLowerCase()
   const activityName = (activity.activityName || '').toLowerCase()
   
-  const relevantKeywords = [
-    'walk', 'walking', 'hike', 'hiking', 'trekking', 'trek',
-    'run', 'running', 'jog', 'jogging', 'cycle', 'cycling', 'bike', 'biking',
-    'pedestrian', 'foot', 'trail', 'ramble', 'stroll', 'fitness',
-    'cardio', 'cardiovascular', 'aerobic', 'exercise', 'workout',
-    'elliptical', 'treadmill', 'indoor', 'gym', 'strength', 'training'
-  ]
-  
-  // Check activity type key, display name, and activity name
-  for (const keyword of relevantKeywords) {
-    if (typeKey.includes(keyword) || typeName.includes(keyword) || activityName.includes(keyword)) {
-      return true
-    }
-  }
-  
-  return false
+  return RELEVANT_KEYWORDS.some(keyword => 
+    typeKey.includes(keyword) || typeName.includes(keyword) || activityName.includes(keyword)
+  )
 }
 
-// Simple reverse geocoding fallback
-function getLocationName(lat?: number, lng?: number): string {
-  if (!lat || !lng) return 'Unknown Location'
-  // For now, return coordinates as location
-  // In production, you might want to add a geocoding service
-  return `${lat.toFixed(4)}, ${lng.toFixed(4)}`
-}
+// Simple location fallback - coordinates as location
+const getLocationName = (lat?: number, lng?: number): string => 
+  lat && lng ? `${lat.toFixed(4)}, ${lng.toFixed(4)}` : 'Unknown Location'
 
 // Process raw Garmin activity data
-function processActivity(activity: any): ProcessedActivity {
+const processActivity = (activity: any): ProcessedActivity => {
   const activityId = String(activity.activityId || '')
   const name = activity.activityName || 'Unnamed Activity'
   const distanceMeters = activity.distance || 0
@@ -124,15 +107,11 @@ function processActivity(activity: any): ProcessedActivity {
   const distanceKm = Math.round((distanceMeters / 1000) * 100) / 100
   const durationMinutes = Math.round(durationSeconds / 60)
   const elevationGainM = Math.round(elevationGain)
+  const averageSpeedKmh = distanceMeters && durationSeconds 
+    ? Math.round((distanceMeters / durationSeconds) * 3.6 * 100) / 100 
+    : 0
   
-  // Calculate average speed
-  let averageSpeedKmh = 0
-  if (distanceMeters && durationSeconds) {
-    const averageSpeedMs = distanceMeters / durationSeconds
-    averageSpeedKmh = Math.round(averageSpeedMs * 3.6 * 100) / 100
-  }
-  
-  // Parse start time and calculate end time
+  // Parse timestamps
   let startTime = startTimeLocal
   let endTime = startTimeLocal
   let date = ''
@@ -149,26 +128,13 @@ function processActivity(activity: any): ProcessedActivity {
     }
   }
   
-  // Get locations
-  const startLocation = getLocationName(activity.startLatitude, activity.startLongitude)
-  const endLocation = getLocationName(activity.endLatitude, activity.endLongitude)
-  
-  // Heart rate data
-  let heartRateData = undefined
-  if (activity.averageHR) {
-    heartRateData = {
-      average: activity.averageHR,
-      max: activity.maxHR || activity.averageHR
-    }
-  }
-  
   return {
     activityId,
     name,
     activityType: getActivityTypeDisplay(activity),
     date,
-    startLocation,
-    endLocation,
+    startLocation: getLocationName(activity.startLatitude, activity.startLongitude),
+    endLocation: getLocationName(activity.endLatitude, activity.endLongitude),
     distanceKm,
     elevationGainM,
     durationMinutes,
@@ -176,7 +142,10 @@ function processActivity(activity: any): ProcessedActivity {
     startTime,
     endTime,
     calories: activity.calories,
-    heartRateData
+    heartRateData: activity.averageHR ? {
+      average: activity.averageHR,
+      max: activity.maxHR || activity.averageHR
+    } : undefined
   }
 }
 

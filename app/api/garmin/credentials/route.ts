@@ -1,19 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import CryptoJS from 'crypto-js'
-
-// Encryption key - in production, this should be in environment variables
-const ENCRYPTION_KEY = process.env.GARMIN_ENCRYPTION_KEY || 'default-encryption-key-change-in-production'
-
-function encryptPassword(password: string): string {
-  return CryptoJS.AES.encrypt(password, ENCRYPTION_KEY).toString()
-}
-
-function decryptPassword(encryptedPassword: string): string {
-  const bytes = CryptoJS.AES.decrypt(encryptedPassword, ENCRYPTION_KEY)
-  return bytes.toString(CryptoJS.enc.Utf8)
-}
+import { encryptPassword } from '@/lib/utils/encryption'
 
 // GET - Check if user has Garmin credentials stored
 export async function GET() {
