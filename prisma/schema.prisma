@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -10,29 +7,23 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Users table (NextAuth.js compatible)
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
-  emailVerified DateTime?
-  name          String?
-  image         String?
-  role          UserRole  @default(PILGRIM)
+  id             String    @id @default(cuid())
+  email          String    @unique
+  emailVerified  DateTime?
+  name           String?
+  image          String?
+  role           UserRole  @default(PILGRIM)
   hashedPassword String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-
-  // NextAuth.js relations
-  accounts Account[]
-  sessions Session[]
-  
-  // App relations
-  entries Entry[]
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  accounts       Account[]
+  entries        Entry[]
+  sessions       Session[]
 
   @@map("users")
 }
 
-// NextAuth.js Account model
 model Account {
   id                String  @id @default(cuid())
   userId            String
@@ -46,14 +37,12 @@ model Account {
   scope             String?
   id_token          String?
   session_state     String?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
   @@map("accounts")
 }
 
-// NextAuth.js Session model
 model Session {
   id           String   @id @default(cuid())
   sessionToken String   @unique
@@ -64,7 +53,6 @@ model Session {
   @@map("sessions")
 }
 
-// NextAuth.js VerificationToken model
 model VerificationToken {
   identifier String
   token      String   @unique
@@ -74,34 +62,25 @@ model VerificationToken {
   @@map("verificationtokens")
 }
 
-enum UserRole {
-  PILGRIM
-  FAMILY // Kept for future use, but family viewing is now public
-}
-
-// Journal Entries table
 model Entry {
-  id         String   @id @default(cuid())
+  id         String      @id @default(cuid())
   userId     String
   dayNumber  Int
   date       DateTime
   title      String?
   location   String
   content    String
-  isPrivate  Boolean  @default(false)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  // Relations
-  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  photos     Photo[]
+  isPrivate  Boolean     @default(false)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
   audioFiles AudioFile[]
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   gpsData    GPSData?
+  photos     Photo[]
 
   @@map("entries")
 }
 
-// Photos table
 model Photo {
   id        String   @id @default(cuid())
   entryId   String
@@ -109,42 +88,36 @@ model Photo {
   filename  String
   isHero    Boolean  @default(false)
   createdAt DateTime @default(now())
-
-  // Relations
-  entry Entry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  entry     Entry    @relation(fields: [entryId], references: [id], onDelete: Cascade)
 
   @@map("photos")
 }
 
-// GPS Data table
 model GPSData {
-  id                   String    @id @default(cuid())
-  entryId              String    @unique
-  startLocation        String
-  endLocation          String
-  distanceKm           Float?
-  elevationGainM       Int?
-  durationMinutes      Int?
-  averageSpeedKmh      Float?
-  startTime            DateTime?
-  endTime              DateTime?
-  calories             Int?
-  averageHeartRate     Int?
-  maxHeartRate         Int?
-  source               String?
-  externalActivityId   String?
-  externalUrl          String?
-  rawData              String?   // JSON string of coordinates
-  stravaActivityId     String?   // Legacy field, keeping for compatibility
-  createdAt            DateTime  @default(now())
-
-  // Relations
-  entry Entry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  id                 String    @id @default(cuid())
+  entryId            String    @unique
+  startLocation      String
+  endLocation        String
+  distanceKm         Float?
+  elevationGainM     Int?
+  durationMinutes    Int?
+  averageSpeedKmh    Float?
+  startTime          DateTime?
+  endTime            DateTime?
+  calories           Int?
+  averageHeartRate   Int?
+  maxHeartRate       Int?
+  source             String?
+  externalActivityId String?
+  externalUrl        String?
+  rawData            String?
+  stravaActivityId   String?
+  createdAt          DateTime  @default(now())
+  entry              Entry     @relation(fields: [entryId], references: [id], onDelete: Cascade)
 
   @@map("gps_data")
 }
 
-// Audio Files table
 model AudioFile {
   id            String   @id @default(cuid())
   entryId       String
@@ -153,9 +126,12 @@ model AudioFile {
   transcription String?
   processed     Boolean  @default(false)
   createdAt     DateTime @default(now())
-
-  // Relations
-  entry Entry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  entry         Entry    @relation(fields: [entryId], references: [id], onDelete: Cascade)
 
   @@map("audio_files")
+}
+
+enum UserRole {
+  PILGRIM
+  FAMILY
 }
