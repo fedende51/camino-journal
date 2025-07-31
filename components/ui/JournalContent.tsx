@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import JourneyMap from './JourneyMap'
+import JourneyMap from '../maps/JourneyMap'
 
 interface Entry {
   id: string

@@ -4,8 +4,8 @@ import { useState } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import PhotoGallery from '@/components/PhotoGallery'
-import GPSDataInput from '@/components/GPSDataInput'
+import PhotoGallery from '@/components/ui/PhotoGallery'
+import GPSDataInput from '@/components/forms/GPSDataInput'
 
 export default function CreateEntryPage() {
   const { data: session } = useSession()

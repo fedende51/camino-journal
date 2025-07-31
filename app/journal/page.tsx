@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import JournalContent from '@/components/JournalContent'
+import JournalContent from '@/components/ui/JournalContent'
 
 // Disable static generation for this page
 export const dynamic = 'force-dynamic'
