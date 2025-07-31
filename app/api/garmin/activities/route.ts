@@ -1,8 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { auth } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
+import CryptoJS from 'crypto-js'
+
+// Encryption key - in production, this should be in environment variables
+const ENCRYPTION_KEY = process.env.GARMIN_ENCRYPTION_KEY || 'default-encryption-key-change-in-production'
+
+function decryptPassword(encryptedPassword: string): string {
+  const bytes = CryptoJS.AES.decrypt(encryptedPassword, ENCRYPTION_KEY)
+  return bytes.toString(CryptoJS.enc.Utf8)
+}
 
 interface GarminActivityRequest {
-  email: string
-  password: string
+  email?: string
+  password?: string
   days?: number
 }
 
@@ -171,14 +182,37 @@ function processActivity(activity: any): ProcessedActivity {
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, password, days = 30 }: GarminActivityRequest = await request.json()
-
-    // Validate input
-    if (!email || !password) {
+    const session = await auth()
+    
+    if (!session || session.user.role !== 'PILGRIM') {
       return NextResponse.json(
-        { success: false, error: 'Email and password are required' },
-        { status: 400 }
+        { success: false, error: 'Unauthorized - Pilgrim access required' },
+        { status: 401 }
       )
+    }
+
+    const { email: providedEmail, password: providedPassword, days = 30 }: GarminActivityRequest = await request.json()
+
+    // Get credentials - either from request or from stored user credentials
+    let email = providedEmail
+    let password = providedPassword
+
+    if (!email || !password) {
+      // Try to get stored credentials
+      const user = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { garminEmail: true, garminPasswordHash: true }
+      })
+
+      if (!user?.garminEmail || !user?.garminPasswordHash) {
+        return NextResponse.json(
+          { success: false, error: 'No Garmin credentials found. Please provide credentials or connect your account first.' },
+          { status: 400 }
+        )
+      }
+
+      email = user.garminEmail
+      password = decryptPassword(user.garminPasswordHash) // Decrypt the stored password
     }
 
     // Validate days parameter

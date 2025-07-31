@@ -34,6 +34,7 @@
     "assemblyai": "^4.14.0",
     "autoprefixer": "^10.4.21",
     "bcryptjs": "^3.0.2",
+    "crypto-js": "^4.2.0",
     "eslint": "^9.32.0",
     "eslint-config-next": "^15.4.5",
     "garmin-connect": "^1.6.2",
@@ -47,5 +48,8 @@
     "react-leaflet": "^5.0.0",
     "tailwindcss": "^4.1.11",
     "typescript": "^5.8.3"
+  },
+  "devDependencies": {
+    "@types/crypto-js": "^4.2.2"
   }
 }

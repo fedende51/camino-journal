@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 interface GPSData {
   source: 'garmin' | 'manual'
@@ -58,6 +58,9 @@ export default function GPSDataInput({ date, onGPSDataChange, isLoading = false 
   const [showCredentialsModal, setShowCredentialsModal] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedActivityType, setSelectedActivityType] = useState<string>('All')
+  const [hasStoredCredentials, setHasStoredCredentials] = useState(false)
+  const [storedGarminEmail, setStoredGarminEmail] = useState('')
+  const [isCheckingCredentials, setIsCheckingCredentials] = useState(false)
   
   // Garmin credentials state
   const [garminCredentials, setGarminCredentials] = useState<GarminCredentials>({
@@ -75,9 +78,86 @@ export default function GPSDataInput({ date, onGPSDataChange, isLoading = false 
     calories: 0
   })
 
+  // Check for stored credentials on component mount
+  useEffect(() => {
+    checkStoredCredentials()
+  }, [])
+
+  const checkStoredCredentials = async () => {
+    setIsCheckingCredentials(true)
+    try {
+      const response = await fetch('/api/garmin/credentials')
+      const data = await response.json()
+      
+      if (response.ok && data.hasCredentials) {
+        setHasStoredCredentials(true)
+        setStoredGarminEmail(data.garminEmail)
+        
+        // Automatically fetch activities if we have stored credentials
+        // but only if we don't already have activities loaded
+        if (activities.length === 0 && inputMode === 'search') {
+          setTimeout(() => {
+            fetchActivitiesWithStoredCredentials()
+          }, 100) // Small delay to ensure state is updated
+        }
+      }
+    } catch (error) {
+      console.error('Error checking stored credentials:', error)
+    } finally {
+      setIsCheckingCredentials(false)
+    }
+  }
+
   const handleConnectGarmin = () => {
-    setShowCredentialsModal(true)
+    if (hasStoredCredentials) {
+      // If we have stored credentials, fetch activities directly
+      fetchActivitiesWithStoredCredentials()
+    } else {
+      // Otherwise, show credentials modal
+      setShowCredentialsModal(true)
+      setSearchError('')
+    }
+  }
+
+  const fetchActivitiesWithStoredCredentials = async () => {
+    setIsSearching(true)
     setSearchError('')
+    setActivities([])
+    setFilteredActivities([])
+
+    try {
+      const response = await fetch('/api/garmin/activities', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          days: 30
+        })
+      })
+
+      const data = await response.json()
+
+      if (response.ok && data.success) {
+        if (data.activities && data.activities.length > 0) {
+          setActivities(data.activities)
+          setFilteredActivities(data.activities)
+        } else {
+          setSearchError('No activities found in the last 30 days')
+        }
+      } else {
+        setSearchError(data.error || 'Failed to fetch activities from Garmin Connect')
+        if (data.error?.includes('credentials')) {
+          // If credentials are invalid, remove them and show modal
+          setHasStoredCredentials(false)
+          setStoredGarminEmail('')
+        }
+      }
+    } catch (error) {
+      setSearchError('Network error occurred while connecting to Garmin')
+    } finally {
+      setIsSearching(false)
+    }
   }
 
   const handleGarminLogin = async () => {
@@ -92,7 +172,8 @@ export default function GPSDataInput({ date, onGPSDataChange, isLoading = false 
     setFilteredActivities([])
 
     try {
-      const response = await fetch('/api/garmin/activities', {
+      // First, try to fetch activities to validate credentials
+      const activitiesResponse = await fetch('/api/garmin/activities', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -104,18 +185,40 @@ export default function GPSDataInput({ date, onGPSDataChange, isLoading = false 
         })
       })
 
-      const data = await response.json()
+      const activitiesData = await activitiesResponse.json()
 
-      if (response.ok && data.success) {
-        if (data.activities && data.activities.length > 0) {
-          setActivities(data.activities)
-          setFilteredActivities(data.activities)
+      if (activitiesResponse.ok && activitiesData.success) {
+        // Credentials are valid, store them
+        try {
+          await fetch('/api/garmin/credentials', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              email: garminCredentials.email,
+              password: garminCredentials.password
+            })
+          })
+
+          // Update state to reflect stored credentials
+          setHasStoredCredentials(true)
+          setStoredGarminEmail(garminCredentials.email)
+        } catch (storeError) {
+          console.error('Failed to store credentials:', storeError)
+          // Continue anyway since we got the activities
+        }
+
+        // Display activities
+        if (activitiesData.activities && activitiesData.activities.length > 0) {
+          setActivities(activitiesData.activities)
+          setFilteredActivities(activitiesData.activities)
           setShowCredentialsModal(false)
         } else {
           setSearchError('No activities found in the last 30 days')
         }
       } else {
-        setSearchError(data.error || 'Failed to fetch activities from Garmin Connect')
+        setSearchError(activitiesData.error || 'Failed to fetch activities from Garmin Connect')
       }
     } catch (error) {
       setSearchError('Network error occurred while connecting to Garmin')
@@ -209,6 +312,22 @@ export default function GPSDataInput({ date, onGPSDataChange, isLoading = false 
     setGarminCredentials({ email: '', password: '' })
   }
 
+  const handleDisconnectGarmin = async () => {
+    try {
+      await fetch('/api/garmin/credentials', {
+        method: 'DELETE'
+      })
+      
+      setHasStoredCredentials(false)
+      setStoredGarminEmail('')
+      setActivities([])
+      setFilteredActivities([])
+      setSearchError('')
+    } catch (error) {
+      console.error('Failed to disconnect Garmin:', error)
+    }
+  }
+
   // Get unique activity types for filter buttons
   const getUniqueActivityTypes = () => {
     const types = activities.map(activity => activity.activityType || 'Unknown')
@@ -282,37 +401,86 @@ export default function GPSDataInput({ date, onGPSDataChange, isLoading = false 
                 <span className="text-xl">🔗</span>
               </div>
               <h3 className="text-lg font-medium text-gray-900 mb-2">Connect to Garmin</h3>
-              <p className="text-gray-500 mb-4">
-                Connect your Garmin Connect account to browse your recent activities from the last 30 days.
-              </p>
-              <button
-                type="button"
-                onClick={handleConnectGarmin}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md font-medium"
-                disabled={isLoading || isSearching}
-              >
-                {isSearching ? 'Connecting...' : 'Browse Recent Activities'}
-              </button>
+              {hasStoredCredentials ? (
+                <div className="space-y-3">
+                  <p className="text-gray-500">
+                    Connected as <span className="font-medium text-gray-700">{storedGarminEmail}</span>
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    Browse your recent activities from the last 30 days.
+                  </p>
+                  <div className="flex items-center justify-center space-x-3">
+                    <button
+                      type="button"
+                      onClick={handleConnectGarmin}
+                      className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md font-medium"
+                      disabled={isLoading || isSearching}
+                    >
+                      {isSearching ? 'Loading Activities...' : 'Browse Recent Activities'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleDisconnectGarmin}
+                      className="text-sm text-gray-500 hover:text-gray-700 underline"
+                      disabled={isLoading || isSearching}
+                    >
+                      Disconnect
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-gray-500 mb-4">
+                    Connect your Garmin Connect account to browse your recent activities from the last 30 days.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleConnectGarmin}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md font-medium"
+                    disabled={isLoading || isSearching}
+                  >
+                    {isSearching ? 'Connecting...' : 'Connect to Garmin'}
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
             <div className="space-y-4">
               {/* Activity Browser Header */}
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-medium text-gray-900">
-                  Recent Activities ({activities.length} found)
-                </h3>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActivities([])
-                    setFilteredActivities([])
-                    setSearchQuery('')
-                    setSelectedActivityType('All')
-                  }}
-                  className="text-sm text-gray-500 hover:text-gray-700"
-                >
-                  Disconnect
-                </button>
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900">
+                    Recent Activities ({activities.length} found)
+                  </h3>
+                  {hasStoredCredentials && (
+                    <p className="text-sm text-gray-500">
+                      Connected as {storedGarminEmail}
+                    </p>
+                  )}
+                </div>
+                <div className="flex items-center space-x-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActivities([])
+                      setFilteredActivities([])
+                      setSearchQuery('')
+                      setSelectedActivityType('All')
+                    }}
+                    className="text-sm text-gray-500 hover:text-gray-700"
+                  >
+                    Close
+                  </button>
+                  {hasStoredCredentials && (
+                    <button
+                      type="button"
+                      onClick={handleDisconnectGarmin}
+                      className="text-sm text-red-500 hover:text-red-700"
+                    >
+                      Disconnect Account
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Filters */}
@@ -652,7 +820,7 @@ export default function GPSDataInput({ date, onGPSDataChange, isLoading = false 
               </div>
 
               <div className="text-xs text-gray-500">
-                🔒 Your credentials are used only to fetch activity data and are not stored.
+                🔒 Your credentials will be securely encrypted and stored for automatic activity fetching. You can disconnect anytime.
               </div>
             </div>
 
