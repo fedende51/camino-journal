@@ -42,7 +42,9 @@
       "Bash(DATABASE_URL=\"postgres://neondb_owner:npg_m8bL2MQexlSy@ep-hidden-moon-a2o0t1hi-pooler.eu-central-1.aws.neon.tech/neondb?sslmode=require\" npx prisma db push --accept-data-loss)",
       "Bash(DATABASE_URL=\"postgres://neondb_owner:npg_m8bL2MQexlSy@ep-hidden-moon-a2o0t1hi-pooler.eu-central-1.aws.neon.tech/neondb?sslmode=require\" npx prisma db pull)",
       "mcp__playwright__browser_snapshot",
-      "Bash(kill:*)"
+      "Bash(kill:*)",
+      "Bash(npx next dev:*)",
+      "Bash(DATABASE_URL=\"postgres://neondb_owner:npg_m8bL2MQexlSy@ep-hidden-moon-a2o0t1hi-pooler.eu-central-1.aws.neon.tech/neondb?sslmode=require\" npx prisma db push)"
     ],
     "deny": []
   }

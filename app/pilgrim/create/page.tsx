@@ -19,7 +19,8 @@ export default function CreateEntryPage() {
     location: '',
     title: '',
     content: '',
-    isPrivate: false
+    isPrivate: false,
+    isDraft: false
   })
 
   // Audio processing state
@@ -62,7 +63,7 @@ export default function CreateEntryPage() {
   }
   const [gpsData, setGpsData] = useState<GPSData | null>(null)
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent, asDraft = false) => {
     e.preventDefault()
     setIsLoading(true)
     setError('')
@@ -111,6 +112,7 @@ export default function CreateEntryPage() {
         },
         body: JSON.stringify({
           ...formData,
+          isDraft: asDraft,
           audioUrl: audioUrl || undefined, // Include audio URL if available
           photoUrls: finalPhotoUrls.length > 0 ? finalPhotoUrls : undefined, // Include uploaded photo URLs
           heroPhotoIndex: finalHeroPhotoIndex >= 0 ? finalHeroPhotoIndex : undefined, // Index of hero photo
@@ -625,14 +627,22 @@ export default function CreateEntryPage() {
                 Cancel
               </Link>
               <button
+                type="button"
+                onClick={(e) => handleSubmit(e, true)}
+                disabled={isLoading || isUploadingPhotos || isTranscribing}
+                className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded-md text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isLoading ? 'Saving...' : 'Save as Draft'}
+              </button>
+              <button
                 type="submit"
                 disabled={isLoading || isUploadingPhotos || isTranscribing}
                 className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isLoading ? 'Creating...' : 
+                {isLoading ? 'Publishing...' : 
                  isUploadingPhotos ? 'Uploading Photos...' :
                  isTranscribing ? 'Processing Audio...' : 
-                 'Create Entry'}
+                 'Publish Entry'}
               </button>
             </div>
           </form>

@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { dayNumber, date, location, title, content, isPrivate, audioUrl, photoUrls, heroPhotoIndex, gpsData } = await request.json()
+    const { dayNumber, date, location, title, content, isPrivate, isDraft, audioUrl, photoUrls, heroPhotoIndex, gpsData } = await request.json()
 
     // Validation
     if (!dayNumber || !date || !location || !content) {
@@ -78,20 +78,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check if entry for this day already exists for this user
-    const existingEntry = await prisma.entry.findFirst({
-      where: {
-        userId: session.user.id,
-        dayNumber: parseInt(dayNumber)
-      }
-    })
-
-    if (existingEntry) {
-      return NextResponse.json(
-        { error: `Entry for Day ${dayNumber} already exists` },
-        { status: 400 }
-      )
-    }
+    // Note: Removed restriction on multiple entries per day to allow multiple entries
 
     // Create entry
     const entry = await prisma.entry.create({
@@ -102,7 +89,8 @@ export async function POST(request: NextRequest) {
         location,
         title: title || null,
         content,
-        isPrivate: Boolean(isPrivate)
+        isPrivate: Boolean(isPrivate),
+        isDraft: Boolean(isDraft)
       },
       include: {
         user: {
