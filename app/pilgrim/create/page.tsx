@@ -68,6 +68,42 @@ export default function CreateEntryPage() {
     setError('')
 
     try {
+      let finalPhotoUrls = photoUrls
+      let finalHeroPhotoIndex = -1
+
+      // Upload photos first if there are any
+      if (photos.length > 0) {
+        setIsUploadingPhotos(true)
+        
+        try {
+          const photoFormData = new FormData()
+          photos.forEach(photo => {
+            photoFormData.append('photos', photo.file)
+          })
+
+          const photoResponse = await fetch('/api/upload/photos', {
+            method: 'POST',
+            body: photoFormData
+          })
+
+          if (!photoResponse.ok) {
+            const photoData = await photoResponse.json()
+            throw new Error(photoData.error || 'Failed to upload photos')
+          }
+
+          const photoData = await photoResponse.json()
+          finalPhotoUrls = photoData.photos.map((p: any) => p.url)
+          finalHeroPhotoIndex = photos.findIndex(p => p.isHero)
+          
+          setPhotoUrls(finalPhotoUrls)
+          setIsUploadingPhotos(false)
+        } catch (photoError) {
+          setIsUploadingPhotos(false)
+          throw new Error(`Photo upload failed: ${photoError instanceof Error ? photoError.message : 'Unknown error'}`)
+        }
+      }
+
+      // Create the entry with uploaded photo URLs
       const response = await fetch('/api/entries', {
         method: 'POST',
         headers: {
@@ -76,8 +112,8 @@ export default function CreateEntryPage() {
         body: JSON.stringify({
           ...formData,
           audioUrl: audioUrl || undefined, // Include audio URL if available
-          photoUrls: photoUrls.length > 0 ? photoUrls : undefined, // Include photo URLs if available
-          heroPhotoIndex: photos.findIndex(p => p.isHero), // Index of hero photo
+          photoUrls: finalPhotoUrls.length > 0 ? finalPhotoUrls : undefined, // Include uploaded photo URLs
+          heroPhotoIndex: finalHeroPhotoIndex >= 0 ? finalHeroPhotoIndex : undefined, // Index of hero photo
           gpsData: gpsData || undefined // Include GPS data if available
         }),
       })
