@@ -1,20 +1,57 @@
 {
-  "env": {
-    "DATABASE_URL": "@database-url",
-    "ASSEMBLYAI_API_KEY": "@assemblyai-api-key",
-    "ANTHROPIC_API_KEY": "@anthropic-api-key",
-    "GOOGLE_MAPS_API_KEY": "@google-maps-api-key",
-    "GARMIN_CLIENT_ID": "@garmin-client-id",
-    "GARMIN_CLIENT_SECRET": "@garmin-client-secret",
-    "STRAVA_CLIENT_ID": "@strava-client-id",
-    "STRAVA_CLIENT_SECRET": "@strava-client-secret",
-    "NEXTAUTH_SECRET": "@nextauth-secret",
-    "NEXTAUTH_URL": "@nextauth-url",
-    "BLOB_READ_WRITE_TOKEN": "@blob-read-write-token"
-  },
-  "build": {
-    "env": {
-      "DATABASE_URL": "@database-url"
+  "framework": "nextjs",
+  "buildCommand": "npm run build",
+  "installCommand": "npm install",
+  "devCommand": "npm run dev",
+  "regions": ["iad1"],
+  "functions": {
+    "app/**/*.ts": {
+      "maxDuration": 30
+    },
+    "app/api/**/*.ts": {
+      "maxDuration": 60
     }
-  }
+  },
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        },
+        {
+          "key": "Access-Control-Allow-Methods",
+          "value": "GET, POST, PUT, DELETE, OPTIONS"
+        },
+        {
+          "key": "Access-Control-Allow-Headers",
+          "value": "Content-Type, Authorization"
+        }
+      ]
+    },
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "X-XSS-Protection",
+          "value": "1; mode=block"
+        }
+      ]
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/healthcheck",
+      "destination": "/api/health"
+    }
+  ]
 }
