@@ -13,14 +13,14 @@ export default function NotFound() {
           Pilgrim Not Found
         </h1>
         <p className="text-gray-600 mb-6">
-          The journal you're looking for doesn't exist or has been moved.
+          The journal you&apos;re looking for doesn&apos;t exist or has been moved.
         </p>
         <div className="space-y-3">
           <Link
-            href="/"
+            href="/login"
             className="block w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md font-medium transition-colors"
           >
-            View All Active Pilgrims
+            Pilgrim Login
           </Link>
           <Link
             href="/register"

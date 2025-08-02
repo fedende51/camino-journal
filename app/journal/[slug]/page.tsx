@@ -2,18 +2,17 @@ import { prisma } from '@/lib/prisma'
 import JournalContent from '@/components/ui/JournalContent'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import ShareBanner from './ShareBanner'
 
 export const dynamic = 'force-dynamic'
 
 interface PageProps {
-  params: {
+  params: Promise<{
     slug: string
-  }
+  }>
 }
 
 export default async function IndividualJournalPage({ params }: PageProps) {
-  const { slug } = params
+  const { slug } = await params
 
   // Find the user by journal slug
   const user = await prisma.user.findUnique({
@@ -63,10 +62,10 @@ export default async function IndividualJournalPage({ params }: PageProps) {
           <div className="flex justify-between items-center py-6">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">
-                {user.journalTitle || `${user.name}'s Camino Journey`}
+                {user.journalTitle || `${user.name}&apos;s Camino Journey`}
               </h1>
               <p className="text-sm text-gray-600 mt-1">
-                Following {user.name}'s journey on the Camino de Santiago
+                Following {user.name}&apos;s journey on the Camino de Santiago
               </p>
               <div className="flex items-center space-x-4 mt-2">
                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
@@ -81,12 +80,6 @@ export default async function IndividualJournalPage({ params }: PageProps) {
             {/* Navigation */}
             <div className="flex items-center space-x-3">
               <Link
-                href="/"
-                className="text-gray-600 hover:text-gray-900 text-sm font-medium"
-              >
-                ← All Pilgrims
-              </Link>
-              <Link
                 href="/login"
                 className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
               >
@@ -97,8 +90,6 @@ export default async function IndividualJournalPage({ params }: PageProps) {
         </div>
       </header>
 
-      {/* Share info banner */}
-      <ShareBanner slug={slug} />
 
       {/* Welcome message for empty journals */}
       {entries.length === 0 && (
@@ -110,19 +101,11 @@ export default async function IndividualJournalPage({ params }: PageProps) {
               </svg>
             </div>
             <h2 className="mt-2 text-lg font-medium text-gray-900">
-              🌟 {user.name} hasn't started sharing yet
+              🌟 {user.name} hasn&apos;t started sharing yet
             </h2>
             <p className="mt-1 text-sm text-gray-500">
               Check back soon for updates from their Camino journey!
             </p>
-            <div className="mt-6">
-              <Link
-                href="/"
-                className="text-blue-600 hover:text-blue-500 text-sm font-medium"
-              >
-                ← View other active pilgrims
-              </Link>
-            </div>
           </div>
         </div>
       )}
@@ -135,7 +118,7 @@ export default async function IndividualJournalPage({ params }: PageProps) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="text-center">
             <h3 className="text-lg font-medium text-gray-900 mb-2">
-              Following {user.name}'s Camino Journey
+              Following {user.name}&apos;s Camino Journey
             </h3>
             <p className="text-gray-600 text-sm mb-4">
               Bookmark this page to follow along with their adventure. New entries will appear automatically.

@@ -37,6 +37,7 @@ export default function PilgrimDashboard() {
   const [isLoadingEntries, setIsLoadingEntries] = useState(true)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [userJournalSlug, setUserJournalSlug] = useState<string | null>(null)
 
   const fetchEntries = useCallback(async () => {
     if (!session?.user.id) return
@@ -51,6 +52,20 @@ export default function PilgrimDashboard() {
       console.error('Error fetching entries:', error)
     } finally {
       setIsLoadingEntries(false)
+    }
+  }, [session?.user.id])
+
+  const fetchUserJournalSlug = useCallback(async () => {
+    if (!session?.user.id) return
+    
+    try {
+      const response = await fetch('/api/user/profile')
+      const data = await response.json()
+      if (response.ok && data.journalSlug) {
+        setUserJournalSlug(data.journalSlug)
+      }
+    } catch (error) {
+      console.error('Error fetching user journal slug:', error)
     }
   }, [session?.user.id])
 
@@ -86,9 +101,10 @@ export default function PilgrimDashboard() {
       return
     }
     
-    // Fetch user's entries
+    // Fetch user's entries and journal slug
     fetchEntries()
-  }, [session, status, router, fetchEntries])
+    fetchUserJournalSlug()
+  }, [session, status, router, fetchEntries, fetchUserJournalSlug])
 
   if (status === 'loading') {
     return (
@@ -179,12 +195,21 @@ export default function PilgrimDashboard() {
                   </div>
                 </div>
                 <div className="mt-4">
-                  <Link
-                    href="/journal"
-                    className="block w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium text-center"
-                  >
-                    View Public Journal
-                  </Link>
+                  {userJournalSlug ? (
+                    <Link
+                      href={`/journal/${userJournalSlug}`}
+                      className="block w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium text-center"
+                    >
+                      View Public Journal
+                    </Link>
+                  ) : (
+                    <Link
+                      href="/pilgrim/settings"
+                      className="block w-full bg-gray-400 text-white px-4 py-2 rounded-md text-sm font-medium text-center cursor-not-allowed"
+                    >
+                      Set Journal URL First
+                    </Link>
+                  )}
                 </div>
               </div>
             </div>
