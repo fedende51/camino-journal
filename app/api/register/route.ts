@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
 import { UserRole } from '@prisma/client'
+import { generateUniqueSlug, generateJournalTitle } from '@/lib/utils/slugGeneration'
 
 export async function POST(request: NextRequest) {
   try {
@@ -30,6 +31,20 @@ export async function POST(request: NextRequest) {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 12)
 
+    // Generate journal slug and title
+    let journalSlug: string | undefined
+    let journalTitle: string | undefined
+    
+    if (name) {
+      try {
+        journalSlug = await generateUniqueSlug(name)
+        journalTitle = generateJournalTitle(name)
+      } catch (error) {
+        console.error('Error generating slug:', error)
+        // Continue without slug if generation fails
+      }
+    }
+
     // Create user
     const user = await prisma.user.create({
       data: {
@@ -37,6 +52,8 @@ export async function POST(request: NextRequest) {
         hashedPassword,
         name,
         role,
+        journalSlug,
+        journalTitle,
       }
     })
 

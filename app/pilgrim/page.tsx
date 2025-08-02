@@ -129,7 +129,7 @@ export default function PilgrimDashboard() {
       {/* Main content */}
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             
             {/* Create New Entry Card */}
             <div className="bg-white overflow-hidden shadow rounded-lg">
@@ -184,6 +184,35 @@ export default function PilgrimDashboard() {
                     className="block w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium text-center"
                   >
                     View Public Journal
+                  </Link>
+                </div>
+              </div>
+            </div>
+
+            {/* Journal Settings Card */}
+            <div className="bg-white overflow-hidden shadow rounded-lg">
+              <div className="p-6">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
+                    <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center">
+                      <span className="text-white font-bold">⚙️</span>
+                    </div>
+                  </div>
+                  <div className="ml-4">
+                    <h3 className="text-lg font-medium text-gray-900">
+                      Journal Settings
+                    </h3>
+                    <p className="text-sm text-gray-500">
+                      Customize your journal URL
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <Link
+                    href="/pilgrim/settings"
+                    className="block w-full bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-md text-sm font-medium text-center"
+                  >
+                    Manage Settings
                   </Link>
                 </div>
               </div>
