@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
+import GoogleMapRoute from '@/components/ui/GoogleMapRoute'
 
 interface EntryPageProps {
   params: Promise<{
@@ -23,15 +24,6 @@ export default async function EntryPage({ params }: EntryPageProps) {
       },
       photos: true,
       gpsData: true,
-      audioFiles: {
-        select: {
-          id: true,
-          filename: true,
-          blobUrl: true,
-          transcription: true,
-          processed: true
-        }
-      }
     }
   })
 
@@ -142,83 +134,6 @@ export default async function EntryPage({ params }: EntryPageProps) {
             </div>
           </div>
 
-          {/* Audio Files */}
-          {entry.audioFiles.length > 0 && (
-            <div className="bg-white shadow rounded-lg p-6 mb-8">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">
-                🎤 Audio Recordings
-              </h3>
-              <div className="space-y-4">
-                {entry.audioFiles.map((audio) => (
-                  <div key={audio.id} className="border border-gray-200 rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                          <span className="text-lg">🎵</span>
-                        </div>
-                        <div>
-                          <span className="text-sm font-medium text-gray-900">{audio.filename}</span>
-                          <div className="flex items-center space-x-2 mt-1">
-                            <span className={`px-2 py-1 rounded-full text-xs ${
-                              audio.processed ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-                            }`}>
-                              {audio.processed ? 'Processed' : 'Processing...'}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {/* Audio Player */}
-                    {audio.blobUrl && (
-                      <div className="mb-3">
-                        <audio controls className="w-full">
-                          <source src={audio.blobUrl} type="audio/mpeg" />
-                          Your browser does not support the audio element.
-                        </audio>
-                      </div>
-                    )}
-                    
-                    {/* Transcription */}
-                    {audio.transcription && (
-                      <div className="mt-3">
-                        <details className="group">
-                          <summary className="flex cursor-pointer items-center justify-between rounded-lg p-2 text-gray-900 hover:bg-gray-50">
-                            <div className="flex items-center space-x-2">
-                              <span className="text-sm font-medium">View Transcription</span>
-                              <span className="text-xs text-gray-500">
-                                ({audio.transcription.split(' ').length} words)
-                              </span>
-                            </div>
-                            <span className="shrink-0 transition duration-300 group-open:-rotate-180">
-                              <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                              </svg>
-                            </span>
-                          </summary>
-                          
-                          <div className="mt-2 px-2">
-                            <div className="text-sm text-gray-600 bg-gray-50 rounded-lg p-4 border-l-4 border-blue-200">
-                              <div className="font-medium text-gray-900 mb-2">Original transcription:</div>
-                              <div className="whitespace-pre-wrap leading-relaxed">
-                                {audio.transcription}
-                              </div>
-                            </div>
-                          </div>
-                        </details>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-              
-              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-sm text-blue-700">
-                  <strong>💡 Audio Processing:</strong> Voice recordings are automatically transcribed and cleaned up by AI to create the journal content above.
-                </p>
-              </div>
-            </div>
-          )}
 
           {/* Photo Gallery */}
           {entry.photos.length > 1 && (
@@ -298,11 +213,16 @@ export default async function EntryPage({ params }: EntryPageProps) {
                 </div>
               </div>
               
-              {/* Route Information */}
+              {/* Interactive Route Map */}
+              <div className="mb-4">
+                <GoogleMapRoute 
+                  startLocation={entry.gpsData.startLocation}
+                  endLocation={entry.gpsData.endLocation}
+                />
+              </div>
+
+              {/* Route Details */}
               <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                <div className="text-sm text-gray-600 mb-2">
-                  <strong>Route:</strong> {entry.gpsData.startLocation} → {entry.gpsData.endLocation}
-                </div>
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
                     <span className="text-gray-500">Start Time:</span>

@@ -97,11 +97,6 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    if (params.hasAudio) {
-      whereClause.audioFiles = {
-        some: {}
-      }
-    }
 
     if (params.hasGPS) {
       whereClause.gpsData = {
@@ -191,7 +186,6 @@ export async function GET(request: NextRequest) {
         },
         _count: {
           select: {
-            audioFiles: true,
             photos: true
           }
         }
@@ -232,7 +226,6 @@ async function calculateJourneyStats(whereClause: any) {
     const [
       totalEntries,
       entriesWithPhotos,
-      entriesWithAudio,
       entriesWithGPS,
       gpsStats
     ] = await Promise.all([
@@ -241,12 +234,6 @@ async function calculateJourneyStats(whereClause: any) {
         where: {
           ...whereClause,
           photos: { some: {} }
-        }
-      }),
-      prisma.entry.count({
-        where: {
-          ...whereClause,
-          audioFiles: { some: {} }
         }
       }),
       prisma.entry.count({
@@ -273,19 +260,17 @@ async function calculateJourneyStats(whereClause: any) {
     return {
       totalEntries,
       entriesWithPhotos,
-      entriesWithAudio,
       entriesWithGPS,
-      totalDistance: Math.round((gpsStats._sum.distanceKm || 0) * 100) / 100,
-      totalElevation: Math.round(gpsStats._sum.elevationGainM || 0),
-      totalDuration: Math.round(gpsStats._sum.durationMinutes || 0),
-      averageSpeed: Math.round((gpsStats._avg.averageSpeedKmh || 0) * 100) / 100
+      totalDistance: Math.round((gpsStats?._sum.distanceKm || 0) * 100) / 100,
+      totalElevation: Math.round(gpsStats?._sum.elevationGainM || 0),
+      totalDuration: Math.round(gpsStats?._sum.durationMinutes || 0),
+      averageSpeed: Math.round((gpsStats?._avg.averageSpeedKmh || 0) * 100) / 100
     }
   } catch (error) {
     console.error('Stats calculation error:', error)
     return {
       totalEntries: 0,
       entriesWithPhotos: 0,
-      entriesWithAudio: 0,
       entriesWithGPS: 0,
       totalDistance: 0,
       totalElevation: 0,

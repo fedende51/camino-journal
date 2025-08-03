@@ -26,7 +26,6 @@ interface Entry {
     isHero: boolean
   }>
   _count: {
-    audioFiles: number
   }
 }
 
@@ -344,12 +343,6 @@ export default function PilgrimDashboard() {
                           <span className="flex items-center space-x-1">
                             <span>📸</span>
                             <span>{entry.photos.length}</span>
-                          </span>
-                        )}
-                        {entry._count?.audioFiles > 0 && (
-                          <span className="flex items-center space-x-1">
-                            <span>🎤</span>
-                            <span>{entry._count.audioFiles}</span>
                           </span>
                         )}
                       </div>

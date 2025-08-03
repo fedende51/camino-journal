@@ -46,9 +46,10 @@ interface GPSDataInputProps {
   date: string
   onGPSDataChange: (gpsData: GPSData | null) => void
   isLoading?: boolean
+  initialData?: GPSData | null
 }
 
-export default function GPSDataInput({ date, onGPSDataChange, isLoading = false }: GPSDataInputProps) {
+export default function GPSDataInput({ date, onGPSDataChange, isLoading = false, initialData = null }: GPSDataInputProps) {
   const [inputMode, setInputMode] = useState<'search' | 'manual'>('search')
   const [isSearching, setIsSearching] = useState(false)
   const [activities, setActivities] = useState<GPSData[]>([])
@@ -82,6 +83,25 @@ export default function GPSDataInput({ date, onGPSDataChange, isLoading = false 
   useEffect(() => {
     checkStoredCredentials()
   }, [])
+
+  // Handle initial data
+  useEffect(() => {
+    if (initialData) {
+      setSelectedGPSData(initialData)
+      onGPSDataChange(initialData)
+      setInputMode(initialData.source === 'garmin' ? 'search' : 'manual')
+      if (initialData.source === 'manual') {
+        setManualData({
+          startLocation: initialData.startLocation,
+          endLocation: initialData.endLocation,
+          distanceKm: initialData.distanceKm,
+          elevationGainM: initialData.elevationGainM,
+          durationMinutes: initialData.durationMinutes,
+          calories: initialData.calories || 0
+        })
+      }
+    }
+  }, [initialData])
 
   const checkStoredCredentials = async () => {
     setIsCheckingCredentials(true)

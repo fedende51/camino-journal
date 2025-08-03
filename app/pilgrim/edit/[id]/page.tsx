@@ -4,8 +4,10 @@ import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import PhotoGallery from '@/components/ui/PhotoGallery'
+import GPSDataInput from '@/components/forms/GPSDataInput'
 
-interface Entry {
+interface LoadedEntry {
   id: string
   dayNumber: number
   date: string
@@ -14,21 +16,11 @@ interface Entry {
   content: string
   isPrivate: boolean
   isDraft: boolean
-  createdAt: string
-  user: {
-    name?: string
-    email: string
-  }
   photos: Array<{
     id: string
     blobUrl: string
     filename: string
     isHero: boolean
-  }>
-  audioFiles: Array<{
-    id: string
-    blobUrl: string
-    filename: string
   }>
   gpsData?: {
     id: string
@@ -36,6 +28,17 @@ interface Entry {
     endLocation: string
     distanceKm?: number
     elevationGainM?: number
+    durationMinutes?: number
+    averageSpeedKmh?: number
+    startTime?: string
+    endTime?: string
+    calories?: number
+    averageHeartRate?: number
+    maxHeartRate?: number
+    source?: string
+    externalActivityId?: string
+    externalUrl?: string
+    rawData?: string
   }
 }
 
@@ -45,7 +48,7 @@ export default function EditEntryPage({ params }: { params: Promise<{ id: string
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingEntry, setIsLoadingEntry] = useState(true)
   const [error, setError] = useState('')
-  const [entry, setEntry] = useState<Entry | null>(null)
+  const [entryId, setEntryId] = useState<string>('')
   
   const [formData, setFormData] = useState({
     dayNumber: 1,
@@ -57,39 +60,114 @@ export default function EditEntryPage({ params }: { params: Promise<{ id: string
     isDraft: false
   })
 
+  // Photo management state
+  interface Photo {
+    id: string
+    file: File
+    url: string
+    isHero: boolean
+    processed?: any
+  }
+  const [photos, setPhotos] = useState<Photo[]>([])
+  const [isUploadingPhotos, setIsUploadingPhotos] = useState(false)
+  const [photoUploadError, setPhotoUploadError] = useState('')
+  const [photoUrls, setPhotoUrls] = useState<string[]>([])
+
+  // GPS data state
+  interface GPSData {
+    source: 'garmin' | 'manual'
+    activityId?: string
+    name: string
+    startLocation: string
+    endLocation: string
+    distanceKm: number
+    elevationGainM: number
+    durationMinutes: number
+    averageSpeedKmh: number
+    startTime: Date
+    endTime: Date
+    calories?: number
+    heartRateData?: { average: number; max: number }
+    externalUrl?: string
+    coordinates?: Array<{ lat: number; lng: number }>
+  }
+  const [gpsData, setGpsData] = useState<GPSData | null>(null)
+
   // Load entry data
   useEffect(() => {
-    const fetchEntry = async () => {
+    const loadEntry = async () => {
       try {
         const resolvedParams = await params
-        const response = await fetch(`/api/entries/${resolvedParams.id}`)
-        const data = await response.json()
+        setEntryId(resolvedParams.id)
         
+        const response = await fetch(`/api/entries/${resolvedParams.id}`)
         if (!response.ok) {
-          setError(data.error || 'Failed to load entry')
-          return
+          throw new Error('Entry not found')
         }
-
-        const entry = data.entry
-        setEntry(entry)
+        
+        const entry: LoadedEntry = await response.json()
+        
+        // Populate form data
         setFormData({
           dayNumber: entry.dayNumber,
-          date: new Date(entry.date).toISOString().split('T')[0],
+          date: entry.date.split('T')[0], // Convert to YYYY-MM-DD format
           location: entry.location,
           title: entry.title || '',
           content: entry.content,
           isPrivate: entry.isPrivate,
           isDraft: entry.isDraft
         })
+
+        // Convert existing photos to Photo format
+        if (entry.photos && entry.photos.length > 0) {
+          const existingPhotoUrls = entry.photos.map(p => p.blobUrl)
+          setPhotoUrls(existingPhotoUrls)
+          
+          // Create Photo objects for existing photos (without File objects since they're already uploaded)
+          const existingPhotos: Photo[] = entry.photos.map(photo => ({
+            id: photo.id,
+            file: new File([], photo.filename), // Empty file since it's already uploaded
+            url: photo.blobUrl,
+            isHero: photo.isHero,
+            processed: { url: photo.blobUrl }
+          }))
+          setPhotos(existingPhotos)
+        }
+
+        // Convert GPS data if it exists
+        if (entry.gpsData) {
+          const gps = entry.gpsData
+          setGpsData({
+            source: (gps.source as 'garmin' | 'manual') || 'manual',
+            activityId: gps.externalActivityId,
+            name: `Day ${entry.dayNumber} - ${entry.location}`,
+            startLocation: gps.startLocation,
+            endLocation: gps.endLocation,
+            distanceKm: gps.distanceKm || 0,
+            elevationGainM: gps.elevationGainM || 0,
+            durationMinutes: gps.durationMinutes || 0,
+            averageSpeedKmh: gps.averageSpeedKmh || 0,
+            startTime: gps.startTime ? new Date(gps.startTime) : new Date(),
+            endTime: gps.endTime ? new Date(gps.endTime) : new Date(),
+            calories: gps.calories,
+            heartRateData: gps.averageHeartRate ? {
+              average: gps.averageHeartRate,
+              max: gps.maxHeartRate || 0
+            } : undefined,
+            externalUrl: gps.externalUrl
+          })
+        }
+
+        setIsLoadingEntry(false)
       } catch (error) {
+        console.error('Failed to load entry:', error)
         setError('Failed to load entry')
-      } finally {
         setIsLoadingEntry(false)
       }
     }
 
-    fetchEntry()
-  }, [])
+    loadEntry()
+  }, [params])
 
   const handleSubmit = async (e: React.FormEvent, asDraft = false) => {
     e.preventDefault()
@@ -97,15 +175,59 @@ export default function EditEntryPage({ params }: { params: Promise<{ id: string
     setError('')
 
     try {
-      const resolvedParams = await params
-      const response = await fetch(`/api/entries/${resolvedParams.id}`, {
+      let finalPhotoUrls = photoUrls
+      let finalHeroPhotoIndex = -1
+
+      // Upload new photos if there are any
+      const newPhotos = photos.filter(photo => !photo.processed)
+      if (newPhotos.length > 0) {
+        setIsUploadingPhotos(true)
+        
+        try {
+          const photoFormData = new FormData()
+          newPhotos.forEach(photo => {
+            photoFormData.append('photos', photo.file)
+          })
+
+          const photoResponse = await fetch('/api/upload/photos', {
+            method: 'POST',
+            body: photoFormData
+          })
+
+          if (!photoResponse.ok) {
+            const photoData = await photoResponse.json()
+            throw new Error(photoData.error || 'Failed to upload photos')
+          }
+
+          const photoData = await photoResponse.json()
+          const newPhotoUrls = photoData.photos.map((p: any) => p.url)
+          
+          // Combine existing and new photo URLs
+          finalPhotoUrls = [...photoUrls, ...newPhotoUrls]
+          
+          setPhotoUrls(finalPhotoUrls)
+          setIsUploadingPhotos(false)
+        } catch (photoError) {
+          setIsUploadingPhotos(false)
+          throw new Error(`Photo upload failed: ${photoError instanceof Error ? photoError.message : 'Unknown error'}`)
+        }
+      }
+
+      // Find hero photo index
+      finalHeroPhotoIndex = photos.findIndex(p => p.isHero)
+
+      // Update the entry
+      const response = await fetch(`/api/entries/${entryId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           ...formData,
-          isDraft: asDraft
+          isDraft: asDraft,
+          photoUrls: finalPhotoUrls.length > 0 ? finalPhotoUrls : undefined,
+          heroPhotoIndex: finalHeroPhotoIndex >= 0 ? finalHeroPhotoIndex : undefined,
+          gpsData: gpsData || undefined
         }),
       })
 
@@ -116,7 +238,7 @@ export default function EditEntryPage({ params }: { params: Promise<{ id: string
         return
       }
 
-      // Redirect back to dashboard with success message
+      // Redirect to entry view or back to dashboard
       router.push(`/pilgrim?success=Entry updated successfully`)
     } catch (error) {
       setError('Something went wrong')
@@ -131,6 +253,30 @@ export default function EditEntryPage({ params }: { params: Promise<{ id: string
       ...prev,
       [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value
     }))
+  }
+
+  const handlePhotosChange = (newPhotos: Photo[]) => {
+    setPhotos(newPhotos)
+    setPhotoUploadError('')
+  }
+
+  const handlePhotoUploadStart = () => {
+    setIsUploadingPhotos(true)
+    setPhotoUploadError('')
+  }
+
+  const handlePhotoUploadComplete = (urls: string[]) => {
+    setPhotoUrls(urls)
+    setIsUploadingPhotos(false)
+  }
+
+  const handlePhotoUploadError = (error: string) => {
+    setPhotoUploadError(error)
+    setIsUploadingPhotos(false)
+  }
+
+  const handleGPSDataChange = (newGpsData: GPSData | null) => {
+    setGpsData(newGpsData)
   }
 
   if (!session) {
@@ -149,18 +295,10 @@ export default function EditEntryPage({ params }: { params: Promise<{ id: string
     )
   }
 
-  if (error && !entry) {
+  if (error && !entryId) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-lg text-red-600 mb-4">{error}</div>
-          <Link
-            href="/pilgrim"
-            className="text-blue-600 hover:text-blue-800"
-          >
-            ← Back to Dashboard
-          </Link>
-        </div>
+        <div className="text-lg text-red-600">{error}</div>
       </div>
     )
   }
@@ -176,7 +314,7 @@ export default function EditEntryPage({ params }: { params: Promise<{ id: string
                 ← Back to Dashboard
               </Link>
               <h1 className="text-2xl font-bold text-gray-900 mt-2">
-                Edit Entry - Day {entry?.dayNumber}
+                Edit Entry
               </h1>
             </div>
           </div>
@@ -259,91 +397,100 @@ export default function EditEntryPage({ params }: { params: Promise<{ id: string
 
             {/* Journal Content Section */}
             <div className="bg-white shadow rounded-lg p-6">
-              <h2 className="text-lg font-medium text-gray-900 mb-4">Journal Content</h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-medium text-gray-900">Journal Content</h2>
+              </div>
+              
               <div>
                 <label htmlFor="content" className="block text-sm font-medium text-gray-700 mb-2">
-                  Edit your journal entry
+                  Write about your day on the Camino
                 </label>
                 <textarea
                   id="content"
                   name="content"
                   rows={12}
                   required
-                  placeholder="Tell the story of your day... What did you see? How did you feel? What challenges did you face?"
+                  placeholder="Tell the story of your day... What did you see? How did you feel? What challenges did you face? Where did you stay? What food did you eat?"
                   value={formData.content}
                   onChange={handleChange}
                   className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-3 py-2 border text-gray-900"
                 />
-                <div className="mt-2 flex justify-between items-center">
+                <div className="mt-3 flex justify-between items-center">
                   <p className="text-sm text-gray-500">
                     {formData.content.length} characters • {formData.content.split(' ').filter(word => word.length > 0).length} words
                   </p>
+                  <div className="text-right">
+                    <p className="text-xs text-gray-500">
+                      💡 Tip: You can paste transcribed text from iPhone Voice Memos
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Existing Media Section */}
-            {(entry?.photos && entry.photos.length > 0) || (entry?.audioFiles && entry.audioFiles.length > 0) || entry?.gpsData ? (
-              <div className="bg-white shadow rounded-lg p-6">
-                <h2 className="text-lg font-medium text-gray-900 mb-4">Existing Media & Data</h2>
-                
-                {entry.photos && entry.photos.length > 0 && (
-                  <div className="mb-4">
-                    <h3 className="text-sm font-medium text-gray-700 mb-2">Photos ({entry.photos.length})</h3>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      {entry.photos.map((photo) => (
-                        <div key={photo.id} className="relative">
-                          <img
-                            src={photo.blobUrl}
-                            alt={photo.filename}
-                            className="w-full h-24 object-cover rounded"
-                          />
-                          {photo.isHero && (
-                            <span className="absolute top-1 right-1 bg-yellow-500 text-white text-xs px-1 rounded">
-                              Hero
-                            </span>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+            {/* Photos Section */}
+            <div className="bg-white shadow rounded-lg p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-medium text-gray-900">Photos</h2>
+                {photos.length > 0 && (
+                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                    {photos.length} photo{photos.length !== 1 ? 's' : ''} selected
+                  </span>
                 )}
-
-                {entry.audioFiles && entry.audioFiles.length > 0 && (
-                  <div className="mb-4">
-                    <h3 className="text-sm font-medium text-gray-700 mb-2">Audio Files ({entry.audioFiles.length})</h3>
-                    {entry.audioFiles.map((audio) => (
-                      <div key={audio.id} className="flex items-center space-x-2 mb-2">
-                        <span className="text-sm">🎤</span>
-                        <span className="text-sm text-gray-600">{audio.filename}</span>
-                        <audio controls className="h-8">
-                          <source src={audio.blobUrl} type="audio/mpeg" />
-                        </audio>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {entry.gpsData && (
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-700 mb-2">GPS Data</h3>
-                    <div className="text-sm text-gray-600">
-                      <p><strong>Route:</strong> {entry.gpsData.startLocation} → {entry.gpsData.endLocation}</p>
-                      {entry.gpsData.distanceKm && (
-                        <p><strong>Distance:</strong> {entry.gpsData.distanceKm} km</p>
-                      )}
-                      {entry.gpsData.elevationGainM && (
-                        <p><strong>Elevation:</strong> {entry.gpsData.elevationGainM} m</p>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                <p className="text-xs text-gray-500 mt-4">
-                  Note: You can only edit text content. To modify photos, audio, or GPS data, create a new entry.
-                </p>
               </div>
-            ) : null}
+              
+              <PhotoGallery
+                photos={photos}
+                onPhotosChange={handlePhotosChange}
+                onUploadStart={handlePhotoUploadStart}
+                onUploadComplete={handlePhotoUploadComplete}
+                onUploadError={handlePhotoUploadError}
+                isUploading={isUploadingPhotos}
+              />
+              
+              {photoUploadError && (
+                <div className="mt-4 bg-red-50 border border-red-200 rounded-md p-4">
+                  <div className="text-red-700 text-sm">
+                    <strong>Photo upload error:</strong> {photoUploadError}
+                  </div>
+                </div>
+              )}
+              
+              {photos.length > 0 && (
+                <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-sm text-blue-700">
+                    <strong>💡 Hero Image:</strong> The hero image will be displayed prominently in your journal entry and in the entry list.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* GPS Data Section */}
+            <div className="bg-white shadow rounded-lg p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-medium text-gray-900">Route Data</h2>
+                {gpsData && (
+                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                    {gpsData.source === 'manual' ? 'Manual Entry' : 'From Garmin'}
+                  </span>
+                )}
+              </div>
+              
+              <GPSDataInput
+                date={formData.date}
+                onGPSDataChange={handleGPSDataChange}
+                isLoading={isLoading}
+                initialData={gpsData}
+              />
+              
+              {gpsData && (
+                <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-sm text-blue-700">
+                    <strong>💡 Route Information:</strong> GPS data helps family members follow your daily progress and adds rich context to your journal entries.
+                  </p>
+                </div>
+              )}
+            </div>
 
             {/* Privacy Settings */}
             <div className="bg-white shadow rounded-lg p-6">
@@ -376,7 +523,7 @@ export default function EditEntryPage({ params }: { params: Promise<{ id: string
               </div>
             )}
 
-            {/* Submit Buttons */}
+            {/* Submit Button */}
             <div className="flex justify-end space-x-4">
               <Link
                 href="/pilgrim"
@@ -387,17 +534,19 @@ export default function EditEntryPage({ params }: { params: Promise<{ id: string
               <button
                 type="button"
                 onClick={(e) => handleSubmit(e, true)}
-                disabled={isLoading}
+                disabled={isLoading || isUploadingPhotos}
                 className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded-md text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? 'Saving...' : 'Save as Draft'}
               </button>
               <button
                 type="submit"
-                disabled={isLoading}
+                disabled={isLoading || isUploadingPhotos}
                 className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isLoading ? 'Publishing...' : 'Publish Entry'}
+                {isLoading ? 'Updating...' : 
+                 isUploadingPhotos ? 'Uploading Photos...' : 
+                 'Update Entry'}
               </button>
             </div>
           </form>

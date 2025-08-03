@@ -23,6 +23,7 @@
   "description": "",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.57.0",
+    "@googlemaps/js-api-loader": "^1.16.10",
     "@prisma/client": "^6.13.0",
     "@tailwindcss/postcss": "^4.1.11",
     "@types/bcryptjs": "^2.4.6",
@@ -31,7 +32,6 @@
     "@types/react": "^19.1.9",
     "@types/react-dom": "^19.1.7",
     "@vercel/blob": "^1.1.1",
-    "assemblyai": "^4.14.0",
     "autoprefixer": "^10.4.21",
     "bcryptjs": "^3.0.2",
     "crypto-js": "^4.2.0",
@@ -50,6 +50,7 @@
     "typescript": "^5.8.3"
   },
   "devDependencies": {
-    "@types/crypto-js": "^4.2.2"
+    "@types/crypto-js": "^4.2.2",
+    "@types/google.maps": "^3.58.1"
   }
 }
