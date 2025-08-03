@@ -32,52 +32,23 @@ interface JournalContentProps {
 }
 
 export default function JournalContent({ entries }: JournalContentProps) {
-  const [viewMode, setViewMode] = useState<'timeline' | 'map'>('timeline')
-
   return (
     <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
       <div className="px-4 py-6 sm:px-0">
         
-        {/* Navigation options */}
-        <div className="mb-8 flex space-x-4">
-          <button 
-            onClick={() => setViewMode('timeline')}
-            className={`px-4 py-2 rounded-md font-medium transition-colors ${
-              viewMode === 'timeline' 
-                ? 'bg-blue-600 text-white' 
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
-          >
-            📋 Timeline View
-          </button>
-          <button 
-            onClick={() => setViewMode('map')}
-            className={`px-4 py-2 rounded-md font-medium transition-colors ${
-              viewMode === 'map' 
-                ? 'bg-blue-600 text-white' 
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
-          >
-            🗺️ Map View
-          </button>
+        {/* Chronological entries */}
+        <TimelineView entries={entries} />
+        
+        {/* Map section */}
+        <div className="mt-12">
+          <MapSection entries={entries} />
         </div>
-
-        {/* Content based on view mode */}
-        {viewMode === 'timeline' ? (
-          <TimelineView entries={entries} />
-        ) : (
-          <MapView entries={entries} />
-        )}
-
-        {/* Info about public access */}
-        <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
-          <h3 className="text-lg font-medium text-blue-900 mb-2">
-            Following the Journey
-          </h3>
-          <p className="text-blue-700 text-sm">
-            💡 This page is publicly accessible - bookmark this URL to follow the pilgrim&apos;s journey. No account needed!
-          </p>
+        
+        {/* Statistics section */}
+        <div className="mt-12">
+          <StatisticsSection entries={entries} />
         </div>
+        
       </div>
     </main>
   )
@@ -195,45 +166,43 @@ function TimelineView({ entries }: { entries: Entry[] }) {
   )
 }
 
-function MapView({ entries }: { entries: Entry[] }) {
+function MapSection({ entries }: { entries: Entry[] }) {
   return (
-    <div className="space-y-6">
-      <div className="bg-white rounded-lg p-6 shadow">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Journey Map</h2>
-        <p className="text-gray-600 text-sm mb-6">
-          Follow the Camino journey on the map below. Click on any pin to see details about that day&apos;s entry.
-        </p>
-        <JourneyMap entries={entries} />
-      </div>
-      
-      {/* Quick stats */}
-      <div className="bg-white rounded-lg p-6 shadow">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Journey Statistics</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="text-center">
-            <div className="text-2xl font-bold text-blue-600">{entries.length}</div>
-            <div className="text-sm text-gray-500">Days</div>
+    <div className="bg-white rounded-lg p-6 shadow">
+      <h2 className="text-xl font-semibold text-gray-900 mb-4">🗺️ Journey Map</h2>
+      <JourneyMap entries={entries} />
+    </div>
+  )
+}
+
+function StatisticsSection({ entries }: { entries: Entry[] }) {
+  return (
+    <div className="bg-white rounded-lg p-6 shadow">
+      <h3 className="text-lg font-semibold text-gray-900 mb-4">📊 Journey Statistics</h3>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="text-center">
+          <div className="text-2xl font-bold text-blue-600">{entries.length}</div>
+          <div className="text-sm text-gray-500">Days</div>
+        </div>
+        <div className="text-center">
+          <div className="text-2xl font-bold text-green-600">
+            {entries.filter(e => e.gpsData).length}
           </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-green-600">
-              {entries.filter(e => e.gpsData).length}
-            </div>
-            <div className="text-sm text-gray-500">With GPS</div>
+          <div className="text-sm text-gray-500">With GPS</div>
+        </div>
+        <div className="text-center">
+          <div className="text-2xl font-bold text-purple-600">
+            {entries.reduce((acc, e) => acc + (e.photos?.length || 0), 0)}
           </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-purple-600">
-              {entries.reduce((acc, e) => acc + (e.photos?.length || 0), 0)}
-            </div>
-            <div className="text-sm text-gray-500">Photos</div>
+          <div className="text-sm text-gray-500">Photos</div>
+        </div>
+        <div className="text-center">
+          <div className="text-2xl font-bold text-orange-600">
+            {Math.round(
+              entries.reduce((acc, e) => acc + (e.gpsData?.distanceKm || 0), 0)
+            )}
           </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-orange-600">
-              {Math.round(
-                entries.reduce((acc, e) => acc + (e.gpsData?.distanceKm || 0), 0)
-              )}
-            </div>
-            <div className="text-sm text-gray-500">km Total</div>
-          </div>
+          <div className="text-sm text-gray-500">km Total</div>
         </div>
       </div>
     </div>

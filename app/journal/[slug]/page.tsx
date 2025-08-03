@@ -81,9 +81,9 @@ export default async function IndividualJournalPage({ params }: PageProps) {
             <div className="flex items-center space-x-3">
               <Link
                 href="/login"
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
+                className="text-gray-500 hover:text-gray-700 text-sm font-medium transition-colors"
               >
-                Pilgrim Login
+                Log in
               </Link>
             </div>
           </div>
@@ -113,25 +113,6 @@ export default async function IndividualJournalPage({ params }: PageProps) {
       {/* Main journal content */}
       <JournalContent entries={entries} />
 
-      {/* Footer with pilgrim info */}
-      <footer className="bg-white border-t border-gray-200 mt-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="text-center">
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
-              Following {user.name}&apos;s Camino Journey
-            </h3>
-            <p className="text-gray-600 text-sm mb-4">
-              Bookmark this page to follow along with their adventure. New entries will appear automatically.
-            </p>
-            <div className="flex justify-center space-x-6 text-xs text-gray-500">
-              <span>📱 Mobile friendly</span>
-              <span>🔄 Auto-updates</span>
-              <span>🌍 No login required</span>
-              <span>📍 GPS tracking</span>
-            </div>
-          </div>
-        </div>
-      </footer>
     </div>
   )
 }
