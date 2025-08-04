@@ -34,11 +34,6 @@ export async function GET(request: NextRequest) {
         },
         photos: true,
         gpsData: true,
-        _count: {
-          select: {
-            audioFiles: true
-          }
-        }
       },
       orderBy: [
         { date: 'desc' },
@@ -68,7 +63,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { dayNumber, date, location, title, content, isPrivate, isDraft, audioUrl, photoUrls, heroPhotoIndex, gpsData } = await request.json()
+    const { dayNumber, date, location, title, content, isPrivate, isDraft, audioUrl, photoUrls, heroPhotoIndex, gpsData, googlePhotosAlbumUrl, albumCoverImageUrl } = await request.json()
 
     // Validation
     if (!dayNumber || !date || !location || !content) {
@@ -90,7 +85,9 @@ export async function POST(request: NextRequest) {
         title: title || null,
         content,
         isPrivate: Boolean(isPrivate),
-        isDraft: Boolean(isDraft)
+        isDraft: Boolean(isDraft),
+        googlePhotosAlbumUrl: googlePhotosAlbumUrl || null,
+        albumCoverImageUrl: albumCoverImageUrl || null
       },
       include: {
         user: {
@@ -100,27 +97,9 @@ export async function POST(request: NextRequest) {
           }
         },
         photos: true,
-        gpsData: true,
-        audioFiles: true
+        gpsData: true
       }
     })
-
-    // If audioUrl provided, create audio file record
-    if (audioUrl) {
-      try {
-        await prisma.audioFile.create({
-          data: {
-            entryId: entry.id,
-            blobUrl: audioUrl,
-            filename: audioUrl.split('/').pop() || 'audio.m4a',
-            processed: true // Audio is already processed if we're creating the entry
-          }
-        })
-      } catch (error) {
-        console.error('Failed to create audio file record:', error)
-        // Don't fail the entire request if audio file creation fails
-      }
-    }
 
     // If photoUrls provided, create photo records
     if (photoUrls && Array.isArray(photoUrls) && photoUrls.length > 0) {

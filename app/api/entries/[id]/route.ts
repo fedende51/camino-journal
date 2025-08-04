@@ -21,8 +21,7 @@ export async function GET(
           }
         },
         photos: true,
-        gpsData: true,
-        audioFiles: true
+        gpsData: true
       }
     })
 
@@ -87,7 +86,7 @@ export async function PUT(
       )
     }
 
-    const { dayNumber, date, location, title, content, isPrivate, isDraft } = await request.json()
+    const { dayNumber, date, location, title, content, isPrivate, isDraft, googlePhotosAlbumUrl, albumCoverImageUrl } = await request.json()
 
     // Validation
     if (!dayNumber || !date || !location || !content) {
@@ -107,7 +106,9 @@ export async function PUT(
         title: title || null,
         content,
         isPrivate: Boolean(isPrivate),
-        isDraft: Boolean(isDraft)
+        isDraft: Boolean(isDraft),
+        googlePhotosAlbumUrl: googlePhotosAlbumUrl || null,
+        albumCoverImageUrl: albumCoverImageUrl || null
       },
       include: {
         user: {
@@ -117,8 +118,7 @@ export async function PUT(
           }
         },
         photos: true,
-        gpsData: true,
-        audioFiles: true
+        gpsData: true
       }
     })
 

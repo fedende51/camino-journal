@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import GoogleMapRoute from '@/components/ui/GoogleMapRoute'
+import { GooglePhotosAlbumPreview } from '@/components/ui'
 
 interface EntryPageProps {
   params: Promise<{
@@ -173,6 +174,19 @@ export default async function EntryPage({ params }: EntryPageProps) {
                   <strong>💡 Photo Gallery:</strong> Click any photo to view it in full size. The hero image is featured at the top of this entry.
                 </p>
               </div>
+            </div>
+          )}
+
+          {/* Google Photos Album */}
+          {entry.googlePhotosAlbumUrl && (
+            <div className="bg-white shadow rounded-lg p-6 mb-8">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">📷 Complete Photo Album</h3>
+              <GooglePhotosAlbumPreview
+                albumUrl={entry.googlePhotosAlbumUrl}
+                coverImageUrl={entry.albumCoverImageUrl}
+                dayNumber={entry.dayNumber}
+                className="max-w-md"
+              />
             </div>
           )}
 
