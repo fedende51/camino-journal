@@ -12,6 +12,8 @@ interface Entry {
   title?: string | null
   content: string
   createdAt: Date
+  isPrivate: boolean
+  isDraft: boolean
   user: {
     name?: string | null
     email: string
@@ -171,6 +173,7 @@ function MapSection({ entries }: { entries: Entry[] }) {
   const normalizedEntries = entries.map(entry => ({
     ...entry,
     date: entry.date instanceof Date ? entry.date.toISOString() : entry.date,
+    title: entry.title || undefined, // Convert null to undefined
     photos: entry.photos || []
   }))
 

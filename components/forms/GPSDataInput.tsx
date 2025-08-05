@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import LocationSelector from './LocationSelector'
+import { calculateDistance, hasMeaningfulCoordinates, type Coordinates } from '@/lib/utils/distance'
 
 interface GPSData {
   source: 'garmin' | 'manual'
@@ -27,14 +29,21 @@ interface GPSData {
   }>
 }
 
+interface LocationData {
+  name: string
+  latitude: number
+  longitude: number
+}
+
 interface ManualGPSInput {
-  startLocation: string
-  endLocation: string
+  startLocation: LocationData | null
+  endLocation: LocationData | null
   distanceKm: number
   elevationGainM: number
   durationMinutes: number
   startTime?: Date
   calories?: number
+  isDistanceCalculated?: boolean
 }
 
 interface GarminCredentials {
@@ -71,12 +80,13 @@ export default function GPSDataInput({ date, onGPSDataChange, isLoading = false,
 
   // Manual input state
   const [manualData, setManualData] = useState<ManualGPSInput>({
-    startLocation: '',
-    endLocation: '',
+    startLocation: null,
+    endLocation: null,
     distanceKm: 0,
     elevationGainM: 0,
     durationMinutes: 0,
-    calories: 0
+    calories: 0,
+    isDistanceCalculated: false
   })
 
   // Check for stored credentials on component mount
@@ -92,12 +102,13 @@ export default function GPSDataInput({ date, onGPSDataChange, isLoading = false,
       setInputMode(initialData.source === 'garmin' ? 'search' : 'manual')
       if (initialData.source === 'manual') {
         setManualData({
-          startLocation: initialData.startLocation,
-          endLocation: initialData.endLocation,
+          startLocation: { name: initialData.startLocation, latitude: 0, longitude: 0 },
+          endLocation: { name: initialData.endLocation, latitude: 0, longitude: 0 },
           distanceKm: initialData.distanceKm,
           elevationGainM: initialData.elevationGainM,
           durationMinutes: initialData.durationMinutes,
-          calories: initialData.calories || 0
+          calories: initialData.calories || 0,
+          isDistanceCalculated: false
         })
       }
     }
@@ -242,31 +253,68 @@ export default function GPSDataInput({ date, onGPSDataChange, isLoading = false,
     onGPSDataChange(gpsData)
   }
 
-  const handleManualDataChange = (field: keyof ManualGPSInput, value: any) => {
-    const updatedData = { ...manualData, [field]: value }
+  const handleLocationChange = (field: 'startLocation' | 'endLocation', location: LocationData) => {
+    const updatedData = { ...manualData, [field]: location }
     setManualData(updatedData)
 
-    // Create GPS data from manual input
-    if (updatedData.startLocation && updatedData.endLocation && updatedData.distanceKm > 0 && updatedData.durationMinutes > 0) {
-      const startTime = new Date(date + 'T08:00:00') // Default 8 AM start
-      const endTime = new Date(startTime.getTime() + updatedData.durationMinutes * 60000)
+    // Calculate distance if both locations have coordinates
+    if (updatedData.startLocation && updatedData.endLocation && 
+        hasMeaningfulCoordinates(updatedData.startLocation) && 
+        hasMeaningfulCoordinates(updatedData.endLocation)) {
+      const calculatedDistance = calculateDistance(
+        updatedData.startLocation,
+        updatedData.endLocation
+      )
+      updatedData.distanceKm = calculatedDistance
+      updatedData.isDistanceCalculated = true
+      setManualData(updatedData)
+    }
+
+    // Create GPS data from manual input if we have required fields
+    createGPSDataFromManualInput(updatedData)
+  }
+
+  const handleManualDataChange = (field: keyof ManualGPSInput, value: any) => {
+    const updatedData = { ...manualData, [field]: value }
+    
+    // If user manually changes distance, mark as not calculated
+    if (field === 'distanceKm') {
+      updatedData.isDistanceCalculated = false
+    }
+    
+    setManualData(updatedData)
+    createGPSDataFromManualInput(updatedData)
+  }
+
+  const createGPSDataFromManualInput = (data: ManualGPSInput) => {
+    // Only create GPS data if we have mandatory fields: start and end locations
+    if (data.startLocation && data.endLocation) {
+      const startTime = data.startTime || new Date(date + 'T08:00:00') // Default 8 AM start
+      const durationMs = (data.durationMinutes || 0) * 60000
+      const endTime = new Date(startTime.getTime() + durationMs)
       
       const gpsData: GPSData = {
         source: 'manual',
-        name: `Walking Day - ${updatedData.startLocation} to ${updatedData.endLocation}`,
-        startLocation: updatedData.startLocation,
-        endLocation: updatedData.endLocation,
-        distanceKm: updatedData.distanceKm,
-        elevationGainM: updatedData.elevationGainM,
-        durationMinutes: updatedData.durationMinutes,
-        averageSpeedKmh: Math.round((updatedData.distanceKm / (updatedData.durationMinutes / 60)) * 100) / 100,
+        name: `Walking Day - ${data.startLocation.name} to ${data.endLocation.name}`,
+        startLocation: data.startLocation.name,
+        endLocation: data.endLocation.name,
+        distanceKm: data.distanceKm || 0,
+        elevationGainM: data.elevationGainM || 0,
+        durationMinutes: data.durationMinutes || 0,
+        averageSpeedKmh: data.distanceKm && data.durationMinutes 
+          ? Math.round((data.distanceKm / (data.durationMinutes / 60)) * 100) / 100 
+          : 0,
         startTime,
         endTime,
-        calories: updatedData.calories
+        calories: data.calories
       }
       
       setSelectedGPSData(gpsData)
       onGPSDataChange(gpsData)
+    } else {
+      // Clear GPS data if mandatory fields are missing
+      setSelectedGPSData(null)
+      onGPSDataChange(null)
     }
   }
 
@@ -314,12 +362,13 @@ export default function GPSDataInput({ date, onGPSDataChange, isLoading = false,
     setSelectedGPSData(null)
     resetToInitialState()
     setManualData({
-      startLocation: '',
-      endLocation: '',
+      startLocation: null,
+      endLocation: null,
       distanceKm: 0,
       elevationGainM: 0,
       durationMinutes: 0,
-      calories: 0
+      calories: 0,
+      isDistanceCalculated: false
     })
     onGPSDataChange(null)
   }
@@ -645,35 +694,33 @@ export default function GPSDataInput({ date, onGPSDataChange, isLoading = false,
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Start Location
+                Start Location <span className="text-red-500">*</span>
               </label>
-              <input
-                type="text"
-                value={manualData.startLocation}
-                onChange={(e) => handleManualDataChange('startLocation', e.target.value)}
+              <LocationSelector
+                value={manualData.startLocation?.name || ''}
+                onChange={(location) => handleLocationChange('startLocation', location)}
                 placeholder="e.g., Saint-Jean-Pied-de-Port"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-900"
                 disabled={isLoading}
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                End Location
+                End Location <span className="text-red-500">*</span>
               </label>
-              <input
-                type="text"
-                value={manualData.endLocation}
-                onChange={(e) => handleManualDataChange('endLocation', e.target.value)}
+              <LocationSelector
+                value={manualData.endLocation?.name || ''}
+                onChange={(location) => handleLocationChange('endLocation', location)}
                 placeholder="e.g., Roncesvalles"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-900"
                 disabled={isLoading}
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Distance (km)
+                Distance (km) {manualData.isDistanceCalculated && (
+                  <span className="text-green-600 text-xs font-normal">✓ Auto-calculated</span>
+                )}
               </label>
               <input
                 type="number"
@@ -681,15 +728,17 @@ export default function GPSDataInput({ date, onGPSDataChange, isLoading = false,
                 step="0.1"
                 value={manualData.distanceKm || ''}
                 onChange={(e) => handleManualDataChange('distanceKm', parseFloat(e.target.value) || 0)}
-                placeholder="25.5"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                placeholder="25.5 (auto-calculated if locations selected)"
+                className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-900 ${
+                  manualData.isDistanceCalculated ? 'bg-green-50' : ''
+                }`}
                 disabled={isLoading}
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Duration (minutes)
+                Duration (minutes) <span className="text-gray-400 text-xs">(optional)</span>
               </label>
               <input
                 type="number"
@@ -704,7 +753,7 @@ export default function GPSDataInput({ date, onGPSDataChange, isLoading = false,
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Elevation Gain (m)
+                Elevation Gain (m) <span className="text-gray-400 text-xs">(optional)</span>
               </label>
               <input
                 type="number"
