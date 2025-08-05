@@ -4,6 +4,7 @@ import { useSession, signOut } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
+import DashboardMap from '@/components/maps/DashboardMap'
 
 interface Entry {
   id: string
@@ -29,6 +30,15 @@ interface Entry {
   }
 }
 
+interface PaginationInfo {
+  page: number
+  limit: number
+  totalEntries: number
+  totalPages: number
+  hasNext: boolean
+  hasPrev: boolean
+}
+
 export default function PilgrimDashboard() {
   const { data: session, status } = useSession()
   const router = useRouter()
@@ -37,15 +47,29 @@ export default function PilgrimDashboard() {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [userJournalSlug, setUserJournalSlug] = useState<string | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pagination, setPagination] = useState<PaginationInfo | null>(null)
+  const [allEntries, setAllEntries] = useState<Entry[]>([]) // For map display
 
-  const fetchEntries = useCallback(async () => {
+  const fetchEntries = useCallback(async (page: number = 1) => {
     if (!session?.user.id) return
     
     try {
-      const response = await fetch(`/api/entries?includePrivate=true&userId=${session.user.id}`)
+      // Fetch paginated entries for display
+      const response = await fetch(`/api/entries?includePrivate=true&userId=${session.user.id}&page=${page}&limit=10`)
       const data = await response.json()
       if (response.ok) {
         setEntries(data.entries || [])
+        setPagination(data.pagination)
+      }
+
+      // Fetch all entries for map display (only if page 1 or first load)
+      if (page === 1) {
+        const allResponse = await fetch(`/api/entries?includePrivate=true&userId=${session.user.id}&limit=1000`)
+        const allData = await allResponse.json()
+        if (allResponse.ok) {
+          setAllEntries(allData.entries || [])
+        }
       }
     } catch (error) {
       console.error('Error fetching entries:', error)
@@ -76,8 +100,8 @@ export default function PilgrimDashboard() {
       })
       
       if (response.ok) {
-        // Remove entry from local state
-        setEntries(prev => prev.filter(entry => entry.id !== entryId))
+        // Refetch current page to update pagination
+        await fetchEntries(currentPage)
         setDeleteConfirm(null)
       } else {
         console.error('Failed to delete entry')
@@ -87,6 +111,12 @@ export default function PilgrimDashboard() {
     } finally {
       setIsDeleting(false)
     }
+  }
+
+  const handlePageChange = (newPage: number) => {
+    setCurrentPage(newPage)
+    setIsLoadingEntries(true)
+    fetchEntries(newPage)
   }
 
   useEffect(() => {
@@ -101,7 +131,7 @@ export default function PilgrimDashboard() {
     }
     
     // Fetch user's entries and journal slug
-    fetchEntries()
+    fetchEntries(1)
     fetchUserJournalSlug()
   }, [session, status, router, fetchEntries, fetchUserJournalSlug])
 
@@ -371,6 +401,58 @@ export default function PilgrimDashboard() {
                 ))}
               </div>
             )}
+            
+            {/* Pagination Controls */}
+            {pagination && pagination.totalPages > 1 && (
+              <div className="mt-6 flex items-center justify-between">
+                <div className="text-sm text-gray-700">
+                  Showing page {pagination.page} of {pagination.totalPages} ({pagination.totalEntries} total entries)
+                </div>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={!pagination.hasPrev}
+                    className="px-3 py-1 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Previous
+                  </button>
+                  
+                  {/* Page numbers */}
+                  <div className="hidden sm:flex items-center space-x-1">
+                    {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
+                      const page = i + Math.max(1, Math.min(pagination.page - 2, pagination.totalPages - 4))
+                      return (
+                        <button
+                          key={page}
+                          onClick={() => handlePageChange(page)}
+                          className={`px-3 py-1 rounded-md text-sm font-medium ${
+                            page === pagination.page
+                              ? 'bg-blue-600 text-white'
+                              : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  
+                  <button
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={!pagination.hasNext}
+                    className="px-3 py-1 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Journey Map */}
+          <div className="mt-8">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Journey Map</h2>
+            <DashboardMap entries={allEntries} />
           </div>
 
         </div>

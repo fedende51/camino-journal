@@ -8,6 +8,11 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const includePrivate = searchParams.get('includePrivate') === 'true'
     const userId = searchParams.get('userId')
+    const page = parseInt(searchParams.get('page') || '1')
+    const limit = parseInt(searchParams.get('limit') || '50') // Default to 50, will be 10 for pagination
+    
+    // Calculate skip for pagination
+    const skip = (page - 1) * limit
 
     // If includePrivate is true, verify the user is authenticated
     if (includePrivate) {
@@ -20,11 +25,19 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    const whereClause = {
+      ...(userId && { userId }),
+      ...(includePrivate ? {} : { isPrivate: false }) // Only public entries if not includePrivate
+    }
+
+    // Get total count for pagination
+    const totalEntries = await prisma.entry.count({
+      where: whereClause
+    })
+
+    // Get paginated entries
     const entries = await prisma.entry.findMany({
-      where: {
-        ...(userId && { userId }),
-        ...(includePrivate ? {} : { isPrivate: false }) // Only public entries if not includePrivate
-      },
+      where: whereClause,
       include: {
         user: {
           select: {
@@ -38,10 +51,24 @@ export async function GET(request: NextRequest) {
       orderBy: [
         { date: 'desc' },
         { dayNumber: 'desc' }
-      ]
+      ],
+      skip,
+      take: limit
     })
 
-    return NextResponse.json({ entries })
+    const totalPages = Math.ceil(totalEntries / limit)
+
+    return NextResponse.json({ 
+      entries,
+      pagination: {
+        page,
+        limit,
+        totalEntries,
+        totalPages,
+        hasNext: page < totalPages,
+        hasPrev: page > 1
+      }
+    })
   } catch (error) {
     console.error('Error fetching entries:', error)
     return NextResponse.json(
@@ -63,10 +90,22 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { dayNumber, date, location, title, content, isPrivate, isDraft, audioUrl, photoUrls, heroPhotoIndex, gpsData, googlePhotosAlbumUrl, albumCoverImageUrl } = await request.json()
+    const requestData = await request.json()
+    console.log('Entry creation request data:', JSON.stringify(requestData, null, 2))
+    
+    const { dayNumber, date, location, title, content, isPrivate, isDraft, audioUrl, photoUrls, heroPhotoIndex, gpsData, googlePhotosAlbumUrl, albumCoverImageUrl } = requestData
 
-    // Validation
+    // Validation - temporarily relaxed for debugging
+    console.log('Validation check:', {
+      dayNumber: dayNumber, dayNumberType: typeof dayNumber, dayNumberTruthy: !!dayNumber,
+      date: date, dateType: typeof date, dateTruthy: !!date,
+      location: location, locationType: typeof location, locationTruthy: !!location,
+      content: content, contentType: typeof content, contentTruthy: !!content
+    })
+    
+    // Validation 
     if (!dayNumber || !date || !location || !content) {
+      console.log('Validation failed - missing required fields')
       return NextResponse.json(
         { error: 'Day number, date, location, and content are required' },
         { status: 400 }
@@ -76,6 +115,19 @@ export async function POST(request: NextRequest) {
     // Note: Removed restriction on multiple entries per day to allow multiple entries
 
     // Create entry
+    console.log('Creating entry with data:', {
+      userId: session.user.id,
+      dayNumber: parseInt(dayNumber),
+      date: new Date(date),
+      location,
+      title: title || null,
+      content,
+      isPrivate: Boolean(isPrivate),
+      isDraft: Boolean(isDraft),
+      googlePhotosAlbumUrl: googlePhotosAlbumUrl || null,
+      albumCoverImageUrl: albumCoverImageUrl || null
+    })
+    
     const entry = await prisma.entry.create({
       data: {
         userId: session.user.id,
@@ -151,6 +203,8 @@ export async function POST(request: NextRequest) {
         // Don't fail the entire request if GPS data creation fails
       }
     }
+
+    console.log('Entry created successfully:', entry.id)
 
     return NextResponse.json(
       { message: 'Entry created successfully', entry },

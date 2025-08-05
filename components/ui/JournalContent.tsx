@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import JourneyMap from '../maps/JourneyMap'
+import DashboardMap from '../maps/DashboardMap'
 
 interface Entry {
   id: string
@@ -167,10 +167,17 @@ function TimelineView({ entries }: { entries: Entry[] }) {
 }
 
 function MapSection({ entries }: { entries: Entry[] }) {
+  // Normalize entries to match DashboardMap expected format
+  const normalizedEntries = entries.map(entry => ({
+    ...entry,
+    date: entry.date instanceof Date ? entry.date.toISOString() : entry.date,
+    photos: entry.photos || []
+  }))
+
   return (
     <div className="bg-white rounded-lg p-6 shadow">
       <h2 className="text-xl font-semibold text-gray-900 mb-4">🗺️ Journey Map</h2>
-      <JourneyMap entries={entries} />
+      <DashboardMap entries={normalizedEntries} />
     </div>
   )
 }
