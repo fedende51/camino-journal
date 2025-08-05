@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import PhotoGallery from '@/components/ui/PhotoGallery'
 import GPSDataInput from '@/components/forms/GPSDataInput'
+import LocationSelector from '@/components/forms/LocationSelector'
 
 export default function CreateEntryPage() {
   const { data: session } = useSession()
@@ -17,6 +18,8 @@ export default function CreateEntryPage() {
     dayNumber: 1,
     date: new Date().toISOString().split('T')[0], // Today's date
     location: '',
+    latitude: null as number | null,
+    longitude: null as number | null,
     title: '',
     content: '',
     isPrivate: false,
@@ -127,7 +130,9 @@ export default function CreateEntryPage() {
           albumCoverImageUrl: finalCoverImageUrl || undefined,
           photoUrls: finalPhotoUrls.length > 0 ? finalPhotoUrls : undefined, // Include uploaded photo URLs
           heroPhotoIndex: finalHeroPhotoIndex >= 0 ? finalHeroPhotoIndex : undefined, // Index of hero photo
-          gpsData: gpsData || undefined // Include GPS data if available
+          gpsData: gpsData || undefined, // Include GPS data if available
+          latitude: formData.latitude,
+          longitude: formData.longitude
         }),
       })
 
@@ -234,6 +239,15 @@ export default function CreateEntryPage() {
     setGpsData(newGpsData)
   }
 
+  const handleLocationChange = (locationData: { name: string; latitude: number; longitude: number }) => {
+    setFormData(prev => ({
+      ...prev,
+      location: locationData.name,
+      latitude: locationData.latitude,
+      longitude: locationData.longitude
+    }))
+  }
+
   if (!session) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -305,16 +319,17 @@ export default function CreateEntryPage() {
                   <label htmlFor="location" className="block text-sm font-medium text-gray-700">
                     Location/Town
                   </label>
-                  <input
-                    type="text"
-                    id="location"
-                    name="location"
-                    required
-                    placeholder="e.g., Saint-Jean-Pied-de-Port"
+                  <LocationSelector
                     value={formData.location}
-                    onChange={handleChange}
-                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm px-3 py-2 border text-gray-900"
+                    onChange={handleLocationChange}
+                    placeholder="e.g., Saint-Jean-Pied-de-Port"
+                    disabled={isLoading}
                   />
+                  {formData.latitude && formData.longitude && (
+                    <p className="mt-1 text-xs text-gray-500">
+                      📍 {formData.latitude.toFixed(4)}, {formData.longitude.toFixed(4)}
+                    </p>
+                  )}
                 </div>
               </div>
 
